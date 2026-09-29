@@ -5,7 +5,7 @@
   "description": "היום בגן — תקשורת יומית בין צוות הגן להורים",
   "type": "module",
   "engines": {
-    "node": ">=22.13"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "node --no-warnings=ExperimentalWarning server/index.js --dev",

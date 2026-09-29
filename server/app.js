@@ -19,10 +19,10 @@ import { parentRoutes } from './routes/parent.js';
 import { kindergartenInfo, vacationSchedule } from './kindergarten.js';
 
 /** Builds the API. Static/client serving is added by server/index.js. */
-export function createApp(db, { secureCookies = false, demo = false } = {}) {
+export function createApp(db, { secureCookies = false, demo = false, trustProxy = 'loopback' } = {}) {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 'loopback');
+  app.set('trust proxy', trustProxy);
 
   app.use((_req, res, next) => {
     res.set({

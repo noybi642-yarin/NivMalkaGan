@@ -28,6 +28,21 @@ Other scripts: `npm test` (API + permission tests), `npm run seed` (reset the de
 also needed once after pulling a schema change; the server refuses to start on an outdated database).
 The database lives at `data/gan.db` (override with `DB_PATH`).
 
+## Deploying to Vercel
+
+`vercel.json` builds the React client to `client/dist` (served as static files) and runs the same Express API as
+one Vercel Function (`api/index.js`). Environment variables (Project → Settings → Environment Variables):
+
+| Variable | Value | Why |
+|---|---|---|
+| `DEMO_MODE` | `true` | Seeds the demo kindergarten and shows the one-tap demo logins |
+| `DB_PATH` | `/tmp/gan.db` (default) | Vercel Functions can only write to `/tmp` |
+
+**Limitation:** `/tmp` is temporary. The SQLite database is recreated whenever a function instance starts, so data
+entered on the live site is not permanent and sessions can end when an instance is replaced. That is fine for a
+demo; real use needs a persistent database (for example a hosted Postgres or libSQL database) in place of the
+local SQLite file.
+
 ## Demo accounts
 
 Password for all: `gan12345` (the login screen also has one-tap demo buttons).

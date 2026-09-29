@@ -1,22 +1,12 @@
 import path from 'node:path';
 import express from 'express';
-import { openDb } from './db.js';
-import { createApp } from './app.js';
-import { seed } from './seed.js';
+import { bootApp, demoFromEnv } from './boot.js';
 
 const dev = process.argv.includes('--dev');
 const production = process.env.NODE_ENV === 'production';
-// Demo mode shows one-tap demo logins and seeds an empty database. Off in production unless asked for.
-const demo = process.env.DEMO_MODE ? process.env.DEMO_MODE === 'true' : !production;
 const port = Number(process.env.PORT) || 3000;
 
-const db = openDb();
-if (demo && !db.prepare('SELECT COUNT(*) AS n FROM users').get().n) {
-  seed(db);
-  console.log('Seeded demo data');
-}
-
-const app = createApp(db, { secureCookies: production, demo });
+const app = bootApp({ production, demo: demoFromEnv(production) });
 
 if (dev) {
   const { createServer } = await import('vite');
