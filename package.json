@@ -1,0 +1,26 @@
+{
+  "name": "hayom-bagan",
+  "private": true,
+  "version": "0.1.0",
+  "description": "היום בגן — תקשורת יומית בין צוות הגן להורים",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node --no-warnings=ExperimentalWarning server/index.js --dev",
+    "build": "vite build",
+    "start": "NODE_ENV=production node --no-warnings=ExperimentalWarning server/index.js",
+    "seed": "node --no-warnings=ExperimentalWarning server/seed.js --reset",
+    "test": "node --no-warnings=ExperimentalWarning --test 'server/test/*.test.js'"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.1"
+  }
+}
