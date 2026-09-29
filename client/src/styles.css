@@ -72,6 +72,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 .hint { color: var(--ink-3); font-size: 0.85rem; text-align: center; padding: 4px 16px 24px; }
 .hint-line { margin-top: 10px; }
 
+/* Footer credit: small, muted, never competing with content. */
+.credit {
+  margin: 28px 16px 8px; text-align: center;
+  font-size: 0.7rem; font-weight: 400; letter-spacing: 0.04em; color: var(--ink-3); opacity: 0.8;
+}
+
 /* ---------- Pastel tones (badges, tiles, avatars) ---------- */
 
 .tone-peach { background: var(--peach); color: var(--peach-ink); }

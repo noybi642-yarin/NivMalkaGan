@@ -12,7 +12,7 @@ import {
   parentUpdateText,
   statusLabel,
 } from '../shared/copy.js';
-import { Avatar, Chip, Icon, SectionHead, Segmented, StatusPill, TopBar, toast } from '../shared/ui.jsx';
+import { Avatar, Chip, Credit, Icon, SectionHead, Segmented, StatusPill, TopBar, toast } from '../shared/ui.jsx';
 import SleepEditor from './SleepEditor.jsx';
 
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
@@ -189,6 +189,7 @@ export default function ChildUpdate({ child, date, day, place, nextChild, onBack
           {todaysSupply?.status === 'done' && <p className="seen">✓ ההורים סימנו: טופל</p>}
           {olderOpen.map((s) => <p className="muted small" key={s.id}>עדיין פתוח מ{formatDayShort(s.date)}</p>)}
         </section>
+        <Credit />
       </main>
 
       <div className="savebar">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ACTIVITY_PRESETS, activityIcon, formatDay } from '../shared/copy.js';
-import { Chip, SectionHead, TopBar } from '../shared/ui.jsx';
+import { Chip, Credit, SectionHead, TopBar } from '../shared/ui.jsx';
 
 /** פעילויות וחוגים — defined once per group; each child's update then just ticks which ones they joined. */
 export default function ActivitiesScreen({ data, place, classSwitcher, onSave, onBack }) {
@@ -48,6 +48,7 @@ export default function ActivitiesScreen({ data, place, classSwitcher, onSave, o
         <div className="page-pad">
           <button className="btn btn-primary btn-block" onClick={onBack}>סיום</button>
         </div>
+        <Credit />
       </main>
     </>
   );

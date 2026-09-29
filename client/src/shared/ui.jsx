@@ -43,7 +43,10 @@ export function Shell({ tabs, tab, onTab, fab, children }) {
   );
   return (
     <div className="app">
-      <main className="main">{children}</main>
+      <main className="main">
+        {children}
+        <Credit />
+      </main>
       <nav className={`nav${fab ? ' has-fab' : ''}`} aria-label="ניווט ראשי">
         {fab ? (
           <>
@@ -57,6 +60,11 @@ export function Shell({ tabs, tab, onTab, fab, children }) {
       </nav>
     </div>
   );
+}
+
+/** Quiet credit line at the end of every page. */
+export function Credit() {
+  return <p className="credit" dir="ltr">Made By Noy Malka</p>;
 }
 
 /** Top bar: leaf badge + kindergarten name + screen title; a back button on inner screens. */

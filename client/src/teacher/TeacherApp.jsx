@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
-import { ErrorState, IconButton, Loading, Shell, toast } from '../shared/ui.jsx';
+import { Credit, ErrorState, IconButton, Loading, Shell, toast } from '../shared/ui.jsx';
 import Dashboard from './Dashboard.jsx';
 import ChildrenScreen from './ChildrenScreen.jsx';
 import ChildUpdate from './ChildUpdate.jsx';
@@ -225,6 +225,7 @@ export default function TeacherApp({ user, onLogout }) {
         <main className="main main-plain">
           <TodayScreen key={data.class.id} {...common} onBack={back} applyField={applyField} patchChild={patchChild}
             onOpenChild={(id) => setScreen({ name: 'child', id })} />
+          <Credit />
         </main>
       </div>
     );

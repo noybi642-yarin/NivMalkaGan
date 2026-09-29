@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MENU_MEALS, formatDay } from '../shared/copy.js';
-import { SectionHead, TopBar, toast } from '../shared/ui.jsx';
+import { Credit, SectionHead, TopBar, toast } from '../shared/ui.jsx';
 
 const PLACEHOLDERS = {
   breakfast: 'כריך גבינה וירקות',
@@ -42,6 +42,7 @@ export default function MenuScreen({ data, place, menu, onSave, onBack }) {
           ))}
           <p className="muted small">בעדכון של כל ילד/ה מסמנים רק איך אכל/ה — לא צריך לכתוב שוב את התפריט.</p>
         </section>
+        <Credit />
       </main>
       <div className="savebar">
         <button className="btn btn-primary btn-block btn-big" disabled={busy} onClick={save}>שמירת התפריט</button>

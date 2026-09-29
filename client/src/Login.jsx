@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './shared/api.js';
-import { Icon } from './shared/ui.jsx';
+import { Credit, Icon } from './shared/ui.jsx';
 
 const ENTRANCES = [
   { role: 'parent', label: 'כניסת הורים', emoji: '👨‍👩‍👧', tag: 'הורים לילדי הגן', text: 'היום של הילד/ה, תפריט, פעילויות והודעות' },
@@ -87,6 +87,7 @@ export default function Login({ onLogin }) {
       )}
 
       <p className="login-foot muted small">🌸 שומרים על פרטיות הילדים — בלי תמונות, רק מה שחשוב</p>
+      <Credit />
     </div>
   );
 }
