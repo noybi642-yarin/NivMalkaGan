@@ -29,18 +29,59 @@ export function normalizeUsername(value) {
   return typeof value === 'string' ? value.trim().toLowerCase().slice(0, 64) : '';
 }
 
-export function createSession(db, userId) {
-  const token = crypto.randomBytes(32).toString('base64url');
-  db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(
-    sha256(token),
-    userId,
-    Date.now() + SESSION_TTL_MS,
-  );
-  return token;
+/*
+ * Sessions are signed tokens (HMAC-SHA256): "<userId>.<expiresAt>.<nonce>.<signature>".
+ * Any server instance holding SESSION_SECRET can verify one without shared storage — needed on
+ * Vercel, where several function instances run side by side with separate databases.
+ * Logging out records the token in revoked_sessions so it stops working.
+ */
+let fallbackSecret;
+function sessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (!fallbackSecret) {
+    if (process.env.VERCEL && process.env.DEMO_MODE === 'true') {
+      // Public demo only: every demo account shares the published password, so a key derived from the
+      // deployment protects nothing extra — but it is identical on every instance of that deployment.
+      const deployment = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || 'demo';
+      fallbackSecret = sha256(`hayom-bagan-demo:${deployment}`);
+    } else {
+      // A single local process: a random key per start is fine (sessions end on restart).
+      if (process.env.VERCEL) console.warn('SESSION_SECRET is not set; sessions will not survive across instances');
+      fallbackSecret = crypto.randomBytes(32).toString('hex');
+    }
+  }
+  return fallbackSecret;
+}
+
+const sign = (payload) => crypto.createHmac('sha256', sessionSecret()).update(payload).digest('base64url');
+
+export function createSession(_db, userId) {
+  const payload = `${userId}.${Date.now() + SESSION_TTL_MS}.${crypto.randomBytes(12).toString('base64url')}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+/** Returns { userId, expiresAt } for a genuine, unexpired token, otherwise null. */
+export function verifySessionToken(token) {
+  const parts = typeof token === 'string' ? token.split('.') : [];
+  if (parts.length !== 4) return null;
+  const payload = parts.slice(0, 3).join('.');
+  const expected = Buffer.from(sign(payload));
+  const actual = Buffer.from(parts[3]);
+  if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
+  const userId = Number(parts[0]);
+  const expiresAt = Number(parts[1]);
+  if (!Number.isInteger(userId) || !(expiresAt > Date.now())) return null;
+  return { userId, expiresAt };
 }
 
 export function destroySession(db, token) {
-  if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
+  const session = verifySessionToken(token);
+  if (!session) return;
+  db.prepare('DELETE FROM revoked_sessions WHERE expires_at < ?').run(Date.now());
+  db.prepare('INSERT OR IGNORE INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)').run(
+    sha256(token),
+    session.expiresAt,
+  );
 }
 
 export function readCookie(req, name) {
@@ -67,13 +108,12 @@ export function sessionCookie(token, { secure }) {
 
 /** Attaches req.user (or null) from the session cookie. */
 export function loadUser(db) {
-  const stmt = db.prepare(`
-    SELECT u.id, u.role, u.name, u.kindergarten_id AS kindergartenId
-    FROM sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ? AND s.expires_at > ?`);
+  const userStmt = db.prepare('SELECT id, role, name, kindergarten_id AS kindergartenId FROM users WHERE id = ?');
+  const revokedStmt = db.prepare('SELECT 1 FROM revoked_sessions WHERE token_hash = ?');
   return (req, _res, next) => {
     const token = readCookie(req, COOKIE);
-    req.user = token ? stmt.get(sha256(token), Date.now()) ?? null : null;
+    const session = token ? verifySessionToken(token) : null;
+    req.user = session && !revokedStmt.get(sha256(token)) ? userStmt.get(session.userId) ?? null : null;
     next();
   };
 }

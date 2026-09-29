@@ -69,7 +69,6 @@ export function createApp(db, { secureCookies = false, demo = false, trustProxy 
       throw new HttpError(401, 'wrong credentials');
     }
     limiter.clear(key);
-    db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
     res.set('Set-Cookie', sessionCookie(createSession(db, user.id), { secure: secureCookies }));
     res.json({ user: { id: user.id, role: user.role, name: user.name } });
   });

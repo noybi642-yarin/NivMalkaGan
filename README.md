@@ -37,6 +37,7 @@ one Vercel Function (`api/index.js`). Environment variables (Project → Setting
 |---|---|---|
 | `DEMO_MODE` | `true` | Seeds the demo kindergarten and shows the one-tap demo logins |
 | `DB_PATH` | `/tmp/gan.db` (default) | Vercel Functions can only write to `/tmp` |
+| `SESSION_SECRET` | a long random string (mark as *Sensitive*) | Signs login cookies so every function instance accepts them. Required outside demo mode; in demo mode a per-deployment key is used if it is missing |
 
 **Limitation:** `/tmp` is temporary. The SQLite database is recreated whenever a function instance starts, so data
 entered on the live site is not permanent and sessions can end when an instance is replaced. That is fine for a

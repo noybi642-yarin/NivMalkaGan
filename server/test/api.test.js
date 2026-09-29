@@ -82,6 +82,26 @@ describe('authentication', () => {
     assert.equal(asParent.status, 200);
   });
 
+  test('a session works on any instance with the same secret; forged tokens do not', async () => {
+    // Vercel runs several function instances, each with its own database.
+    const other = openDb(':memory:');
+    seed(other);
+    const server2 = createApp(other).listen(0);
+    await new Promise((r) => server2.once('listening', r));
+    const base2 = `http://127.0.0.1:${server2.address().port}/api`;
+    try {
+      const cookie = await login(DEMO_ACCOUNTS.staff.username);
+      const me = await fetch(`${base2}/staff/today`, { headers: { cookie } });
+      assert.equal(me.status, 200);
+      const [name, value] = cookie.split('=');
+      const parts = value.split('.');
+      const forged = `${name}=${[String(Number(parts[0]) + 1), ...parts.slice(1)].join('.')}`;
+      assert.equal((await fetch(`${base2}/me`, { headers: { cookie: forged } })).status, 401);
+    } finally {
+      server2.close();
+    }
+  });
+
   test('logout invalidates the session', async () => {
     const cookie = await login(DEMO_ACCOUNTS.parent.username);
     await call(cookie, 'POST', '/auth/logout');

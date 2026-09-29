@@ -45,9 +45,9 @@ CREATE TABLE IF NOT EXISTS parent_children (
   PRIMARY KEY (parent_id, child_id)
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
+-- Signed session tokens that were logged out before they expired.
+CREATE TABLE IF NOT EXISTS revoked_sessions (
   token_hash TEXT PRIMARY KEY,
-  user_id    INTEGER NOT NULL REFERENCES users(id),
   expires_at INTEGER NOT NULL
 );
 
@@ -134,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_supplies_child ON supply_requests(child_id, statu
 CREATE INDEX IF NOT EXISTS idx_updates_child_date ON parent_updates(child_id, date);
 `;
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export function openDb(file = process.env.DB_PATH || path.resolve('data/gan.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
