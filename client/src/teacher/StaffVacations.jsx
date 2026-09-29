@@ -16,8 +16,9 @@ export default function StaffVacations({ place, logoutButton }) {
   const [editing, setEditing] = useState(null); // vacation form values, or null
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  if (error) return <ErrorState onRetry={reload} />;
-  if (!data) return <Loading />;
+  const bar = <TopBar place={place} title="לוח חופשות" action={logoutButton} />;
+  if (error) return <>{bar}<ErrorState onRetry={reload} /></>;
+  if (!data) return <>{bar}<Loading label="רגע, טוען את לוח החופשות…" /></>;
 
   async function send(path, method, body, done) {
     try {

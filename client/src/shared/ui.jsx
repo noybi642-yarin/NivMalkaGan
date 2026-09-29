@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 
 const ICONS = {
   today: 'M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
@@ -218,10 +218,11 @@ export function Toaster() {
   );
 }
 
-export function Loading() {
+/** Clearly visible loading state — a bare skeleton on the pale background read as a blank page. */
+export function Loading({ label = 'רגע, טוען…' }) {
   return (
-    <div className="loading" aria-busy="true">
-      <div className="skeleton" />
+    <div className="loading" role="status" aria-busy="true">
+      <p className="loading-label"><span className="spinner" aria-hidden="true" /> {label}</p>
       <div className="skeleton" />
       <div className="skeleton short" />
     </div>
@@ -230,11 +231,52 @@ export function Loading() {
 
 export function ErrorState({ onRetry }) {
   return (
-    <div className="empty">
-      <p>משהו לא הסתדר בטעינה</p>
-      <button className="btn btn-ghost" onClick={onRetry}>לנסות שוב</button>
-    </div>
+    <section className="card error-card" role="alert">
+      <span className="badge-icon tone-peach" aria-hidden="true">🔌</span>
+      <div>
+        <p className="strong">משהו לא הסתדר בטעינה</p>
+        <p className="muted small">כנראה רגע של חיבור איטי. אפשר לנסות שוב.</p>
+      </div>
+      <button className="btn btn-primary btn-small" onClick={onRetry}>לנסות שוב</button>
+    </section>
   );
+}
+
+/**
+ * Safety net: if a screen ever throws while rendering, show a way back instead of a white page.
+ * (Without it React unmounts the whole app.)
+ */
+export class ErrorBoundary extends Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Screen crashed:', error, info?.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="app crash">
+        <section className="card error-card" role="alert">
+          <span className="badge-icon tone-peach" aria-hidden="true">🙈</span>
+          <div>
+            <p className="strong">משהו השתבש בתצוגה</p>
+            <p className="muted small">הנתונים שמורים. אפשר לחזור למסך הראשי ולהמשיך.</p>
+          </div>
+        </section>
+        <div className="page-pad">
+          <button className="btn btn-primary btn-block" onClick={() => { this.setState({ error: null }); this.props.onReset?.(); }}>
+            חזרה למסך הראשי
+          </button>
+        </div>
+        <p className="credit" dir="ltr">{String(this.state.error?.message ?? '').slice(0, 140)}</p>
+      </div>
+    );
+  }
 }
 
 /** Text that saves itself on blur (and when the component unmounts with unsaved changes). */

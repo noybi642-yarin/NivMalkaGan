@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
-import { Credit, ErrorState, IconButton, Loading, Shell, toast } from '../shared/ui.jsx';
+import { Credit, ErrorState, IconButton, Loading, Shell, TopBar, toast } from '../shared/ui.jsx';
 import Dashboard from './Dashboard.jsx';
 import ChildrenScreen from './ChildrenScreen.jsx';
 import ChildUpdate from './ChildUpdate.jsx';
@@ -185,8 +185,10 @@ export default function TeacherApp({ user, onLogout }) {
   if (tab === 'messages' && !screen) {
     return frame(<MessagesScreen place={kindergarten?.name} info={info} logoutButton={logoutButton} onSeen={markSeen} />);
   }
-  if (error) return frame(<ErrorState onRetry={reload} />);
-  if (!data) return frame(<Loading />);
+  const tabTitle = { home: 'דשבורד', children: 'ילדי הגן' }[tab] ?? 'היום';
+  const bar = <TopBar place={kindergarten?.name} title={tabTitle} action={logoutButton} />;
+  if (error) return frame(<>{bar}<ErrorState onRetry={reload} /></>);
+  if (!data) return frame(<>{bar}<Loading label={classId ? 'רגע, טוען את הקבוצה…' : 'רגע, טוען את היום בגן…'} /></>);
   if (!data.class) return frame(<div className="empty"><p>עוד אין כיתות בגן.</p>{logoutButton}</div>);
 
   const children = data.children;

@@ -358,8 +358,17 @@ textarea.input { display: block; }
 .toast button { background: var(--surface); border: 0; border-radius: 999px; color: var(--mint-ink); font-weight: 700; padding: 6px 14px; }
 @keyframes drop { from { transform: translateY(-16px); opacity: 0.6; } }
 
-.loading { padding: 16px; display: grid; gap: 12px; }
-.skeleton { height: 88px; border-radius: var(--radius); background: linear-gradient(90deg, #efeefb, #f8f7ff, #efeefb); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+.loading { padding: 8px 16px 16px; display: grid; gap: 12px; }
+.loading-label { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 0 6px; color: var(--ink-2); font-weight: 500; }
+.spinner {
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  border: 3px solid var(--peach); border-top-color: var(--primary-bright); animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-card { display: flex; align-items: center; gap: 12px; background: #fff7f4; }
+.error-card > div { flex: 1; }
+.crash { padding-top: calc(24px + env(safe-area-inset-top)); }
+.skeleton { height: 88px; border-radius: var(--radius); background: linear-gradient(90deg, #e9e6f7, #f6f4ff, #e9e6f7); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 .skeleton.short { height: 48px; width: 60%; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 

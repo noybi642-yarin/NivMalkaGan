@@ -4,8 +4,9 @@ import VacationList from '../shared/VacationList.jsx';
 
 export default function ParentVacations({ place, logoutButton }) {
   const { data, error, reload } = useLoad('/vacations');
-  if (error) return <ErrorState onRetry={reload} />;
-  if (!data) return <Loading />;
+  const bar = <TopBar place={place} title="לוח חופשות" action={logoutButton} />;
+  if (error) return <>{bar}<ErrorState onRetry={reload} /></>;
+  if (!data) return <>{bar}<Loading label="רגע, טוען את לוח החופשות…" /></>;
   return (
     <>
       <TopBar place={place} title="לוח חופשות" action={logoutButton} />
