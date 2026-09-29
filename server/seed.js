@@ -8,15 +8,31 @@ import { addDays, todayIL } from './domain.js';
 
 export const DEMO_PASSWORD = 'gan12345';
 export const DEMO_ACCOUNTS = {
-  parent: { phone: '0500000001', name: 'נוי' },
   staff: { phone: '0500000002', name: 'מיכל' },
-  manager: { phone: '0500000003', name: 'אורית' },
+  parent: { phone: '0500000001', name: 'נוי' },
 };
+
+// The official תשפ״ז schedule. display_date / weekdays are only set where the wording differs
+// from what the dates produce on their own.
+const VACATIONS = [
+  ['ראש השנה', 'holiday', '2026-09-11', '2026-09-13', '2026-09-14', { display_date: '11.09 + 13.09', weekdays: 'שישי וראשון' }],
+  ['יום כיפור', 'holiday', '2026-09-20', '2026-09-21', '2026-09-22'],
+  ['סוכות', 'holiday', '2026-09-25', '2026-09-25', '2026-09-27'],
+  ['חול המועד סוכות ושמחת תורה', 'holiday', '2026-09-30', '2026-10-02', '2026-10-04'],
+  ['חנוכה', 'holiday', '2026-12-09', '2026-12-11', '2026-12-13'],
+  ['יום צוות', 'staff_day', '2027-01-29', '2027-01-29', '2027-01-31'],
+  ['פורים', 'holiday', '2027-03-23', '2027-03-24', '2027-03-25'],
+  ['פסח', 'holiday', '2027-04-19', '2027-04-28', '2027-04-29'],
+  ['יום הזיכרון', 'short_day', '2027-05-11', '2027-05-11', null, { note: 'הגן פתוח עד 12:00' }],
+  ['יום העצמאות', 'holiday', '2027-05-12', '2027-05-12', '2027-05-13'],
+  ['שבועות', 'holiday', '2027-06-10', '2027-06-11', '2027-06-13', { weekdays: 'חמישי ושישי' }],
+  ['יום צוות', 'staff_day', '2027-07-09', '2027-07-09', '2027-07-11'],
+];
 
 const CLASSES = [
   {
     name: 'תינוקייה',
-    staff: [['שירן', '0500000010']],
+    staff: [['שירן', '0500000010'], ['אורית', '0500000003']],
     children: [['אגם', 'f'], ['רון', 'm'], ['הדר', 'f'], ['יונתן', 'm'], ['אלה', 'f'], ['נדב', 'm'], ['רומי', 'f'], ['גיא', 'm']],
   },
   {
@@ -64,20 +80,26 @@ export function seed(db, today = todayIL()) {
   const now = Date.now();
 
   tx(db, () => {
-    const kgId = db.prepare('INSERT INTO kindergartens (name) VALUES (?)').run('גן השקמה').lastInsertRowid;
+    const kgId = db
+      .prepare('INSERT INTO kindergartens (name, hours, phone, notice, school_year, summer_start) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('גן השקמה', 'א׳–ה׳ 07:30–16:00 · ו׳ 07:30–12:30', '03-1234567',
+        'תזכורת: בגדים להחלפה בתיק כל יום, מסומנים בשם הילד/ה', 'תשפ״ז', '2027-08-06').lastInsertRowid;
+    for (const [name, type, start, end, ret, extra = {}] of VACATIONS) {
+      db.prepare(
+        `INSERT INTO vacations (kindergarten_id, name, type, start_date, end_date, return_date, note, display_date, weekdays)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(kgId, name, type, start, end, ret, extra.note ?? null, extra.display_date ?? null, extra.weekdays ?? null);
+    }
     const addUser = db.prepare('INSERT INTO users (kindergarten_id, role, name, phone, password_hash) VALUES (?, ?, ?, ?, ?)');
     const user = (role, name, phone) => Number(addUser.run(kgId, role, name, phone, pw).lastInsertRowid);
-
-    user('manager', DEMO_ACCOUNTS.manager.name, DEMO_ACCOUNTS.manager.phone);
 
     const kids = {};
     const classIds = {};
     CLASSES.forEach((cls, i) => {
       const classId = Number(db.prepare('INSERT INTO classes (kindergarten_id, name, sort) VALUES (?, ?, ?)').run(kgId, cls.name, i).lastInsertRowid);
       classIds[cls.name] = classId;
-      for (const [name, phone] of cls.staff) {
-        db.prepare('INSERT INTO staff_classes (user_id, class_id) VALUES (?, ?)').run(user('staff', name, phone), classId);
-      }
+      // Staff (teachers and the owner alike) see the whole kindergarten; the class only groups the demo list.
+      for (const [name, phone] of cls.staff) user('staff', name, phone);
       for (const [name, gender] of cls.children) {
         kids[name] = Number(db.prepare('INSERT INTO children (class_id, name, gender) VALUES (?, ?, ?)').run(classId, name, gender).lastInsertRowid);
       }
@@ -86,6 +108,7 @@ export function seed(db, today = todayIL()) {
     const link = (parentId, child) => db.prepare('INSERT INTO parent_children (parent_id, child_id) VALUES (?, ?)').run(parentId, kids[child]);
     const noy = user('parent', DEMO_ACCOUNTS.parent.name, DEMO_ACCOUNTS.parent.phone);
     link(noy, 'ניב');
+    link(noy, 'אלה'); // Niv's little sister, so the demo shows the child switcher
     const dana = user('parent', 'דנה', '0500000004');
     link(dana, 'יואב');
     const shani = user('parent', 'שני', '0500000005');
@@ -122,7 +145,7 @@ export function seed(db, today = todayIL()) {
     parentUpdate(dana, 'יואב', ['early_pickup'], 'אבא יגיע ב-13:30');
     parentUpdate(shani, 'מאיה', ['other_pickup'], 'סבתא רותי תאסוף היום', true);
 
-    // --- Other classes, so the manager overview has something real to show.
+    // --- Other classes, so the class overview has something real to show.
     classDay('תינוקייה', today, 'דייסת סולת', 'פתיתים עם עוף וירקות מבושלים', ['משחקי חושים']);
     ['אגם', 'רון', 'הדר', 'יונתן', 'אלה', 'נדב'].forEach((c) => report(c, today, FULL));
     report('רומי', today, { food: 'most', mood: 'good' });

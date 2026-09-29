@@ -16,7 +16,7 @@ function commonSleep(children) {
   return { start, end };
 }
 
-export default function TodayScreen({ data, applyField, patchChild, markSeen, onOpenChild, logoutButton, onClass, classId }) {
+export default function TodayScreen({ data, applyField, patchChild, markSeen, onOpenChild, logoutButton, classSwitcher }) {
   const [fieldKey, setFieldKey] = useState('food');
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
@@ -67,18 +67,11 @@ export default function TodayScreen({ data, applyField, patchChild, markSeen, on
   return (
     <>
       <PageHeader
-        eyebrow={
-          data.classes.length > 1 ? (
-            <select className="class-select" value={classId} onChange={(e) => onClass(Number(e.target.value))}
-              aria-label="כיתה">
-              {data.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          ) : data.class.name
-        }
         title={formatDay(data.date)}
-        subtitle={`${complete} מתוך ${present.length} עודכנו`}
+        subtitle={`${data.class.name} · ${complete} מתוך ${present.length} עודכנו`}
         action={logoutButton}
       />
+      {classSwitcher}
       <div className="page-pad">
         <Progress value={complete} total={present.length} />
       </div>

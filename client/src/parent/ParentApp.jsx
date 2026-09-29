@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLoad } from '../shared/api.js';
-import { childWord } from '../shared/copy.js';
+import { childWord, joinHe } from '../shared/copy.js';
 import { ErrorState, IconButton, Loading, Shell } from '../shared/ui.jsx';
 import ParentToday from './ParentToday.jsx';
 import ParentUpdate from './ParentUpdate.jsx';
 import MyChild from './MyChild.jsx';
-import Vacations from './Vacations.jsx';
+import ParentVacations from './ParentVacations.jsx';
 
 const STORAGE_KEY = 'gan:child';
 
@@ -20,6 +20,7 @@ function storedChild() {
 export default function ParentApp({ user, onLogout }) {
   const [tab, setTab] = useState('today');
   const { data, error, reload } = useLoad('/parent/children');
+  const info = useLoad('/kindergarten');
   const [childId, setChildId] = useState(storedChild);
 
   const children = data?.children ?? [];
@@ -53,12 +54,20 @@ export default function ParentApp({ user, onLogout }) {
   );
 
   let content;
-  if (tab === 'vacations') content = <Vacations logoutButton={logoutButton} />;
+  if (tab === 'vacations') content = <ParentVacations logoutButton={logoutButton} />;
   else if (error) content = <ErrorState onRetry={reload} />;
   else if (!data) content = <Loading />;
   else if (!child) content = <div className="empty"><p>עוד לא קושרו ילדים לחשבון. פנו לצוות הגן.</p>{logoutButton}</div>;
   else {
-    const props = { user, child, logoutButton, switcher, goTo: setTab };
+    const props = {
+      user,
+      child,
+      familyName: `ההורים של ${joinHe(children.map((c) => c.name))}`,
+      kindergarten: info.data?.kindergarten,
+      logoutButton,
+      switcher,
+      goTo: setTab,
+    };
     content = (
       <>
         {tab === 'today' && <ParentToday key={child.id} {...props} />}

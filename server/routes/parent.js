@@ -30,7 +30,7 @@ export function parentRoutes(db) {
          JOIN children c ON c.id = pc.child_id
          JOIN classes cl ON cl.id = c.class_id
          JOIN kindergartens k ON k.id = cl.kindergarten_id
-         WHERE pc.parent_id = ? ORDER BY c.name`,
+         WHERE pc.parent_id = ? ORDER BY pc.rowid`,
       )
       .all(req.user.id);
     res.json({ children });

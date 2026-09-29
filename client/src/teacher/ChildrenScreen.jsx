@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { FIELDS, formatDay, g, supplyLabels } from '../shared/copy.js';
 import { Chip, PageHeader } from '../shared/ui.jsx';
 
-export default function ChildrenScreen({ data, onOpenChild, logoutButton }) {
+export default function ChildrenScreen({ data, onOpenChild, logoutButton, classSwitcher }) {
   const [onlyMissing, setOnlyMissing] = useState(false);
   const list = data.children.filter((c) => !onlyMissing || (!c.report.absent && !c.report.complete));
   const missing = data.children.filter((c) => !c.report.absent && !c.report.complete).length;
 
   return (
     <>
-      <PageHeader eyebrow={data.class.name} title="הילדים" subtitle={formatDay(data.date)} action={logoutButton} />
+      <PageHeader title="הילדים" subtitle={`${data.class.name} · ${formatDay(data.date)}`} action={logoutButton} />
+      {classSwitcher}
       <div className="page-pad chips">
         <Chip on={!onlyMissing} onClick={() => setOnlyMissing(false)}>כולם</Chip>
         <Chip on={onlyMissing} onClick={() => setOnlyMissing(true)}>חסר עדכון ({missing})</Chip>

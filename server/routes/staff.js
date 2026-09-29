@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { tx } from '../db.js';
 import { requireRole } from '../auth.js';
-import { staffChild, staffClass } from '../access.js';
+import { staffChild, staffClass, staffVacation } from '../access.js';
+import { kindergartenInfo, parseVacation, parseVacationSettings, vacationSchedule } from '../kindergarten.js';
 import {
   HttpError,
   REPORT_FIELDS,
@@ -24,7 +25,25 @@ export function staffRoutes(db) {
   const r = Router();
   r.use(requireRole('staff'));
 
-  function classPayload(cls, date) {
+  // All classes of the kindergarten with today's completion — the owner's overview and the class switcher.
+  function kindergartenClasses(user, date) {
+    const classes = db
+      .prepare('SELECT id, name FROM classes WHERE kindergarten_id = ? ORDER BY sort')
+      .all(user.kindergartenId);
+    const reports = db.prepare(
+      `SELECT dr.* FROM daily_reports dr JOIN children c ON c.id = dr.child_id
+       WHERE c.class_id = ? AND dr.date = ?`,
+    );
+    const count = db.prepare('SELECT COUNT(*) AS n FROM children WHERE class_id = ?');
+    return classes.map((cl) => {
+      const rows = reports.all(cl.id, date).map(serializeReport);
+      const present = count.get(cl.id).n - rows.filter((r) => r.absent).length;
+      const complete = rows.filter((r) => r.complete).length;
+      return { ...cl, present, complete, pct: present ? Math.round((complete / present) * 100) : 100 };
+    });
+  }
+
+  function classPayload(user, cls, date) {
     const children = db
       .prepare('SELECT id, name, gender FROM children WHERE class_id = ? ORDER BY name')
       .all(cls.id);
@@ -50,6 +69,7 @@ export function staffRoutes(db) {
 
     return {
       date,
+      classes: kindergartenClasses(user, date),
       class: { id: cls.id, name: cls.name },
       day: serializeClassDay(db.prepare('SELECT * FROM class_days WHERE class_id = ? AND date = ?').get(cls.id, date)),
       children: children.map((c) => ({
@@ -61,18 +81,14 @@ export function staffRoutes(db) {
     };
   }
 
-  // Today's class. Staff with several classes get the first one unless ?classId= is given.
+  // Any class of the staff member's kindergarten; the first one unless ?classId= is given.
   r.get('/today', (req, res) => {
-    const classes = db
-      .prepare(
-        `SELECT cl.id, cl.name FROM classes cl JOIN staff_classes sc ON sc.class_id = cl.id
-         WHERE sc.user_id = ? ORDER BY cl.sort`,
-      )
-      .all(req.user.id);
-    if (!classes.length) return res.json({ classes: [], class: null });
-    const classId = req.query.classId ? parseId(req.query.classId) : classes[0].id;
-    const cls = staffClass(db, req.user, classId);
-    res.json({ classes, ...classPayload(cls, todayIL()) });
+    const first = db
+      .prepare('SELECT id FROM classes WHERE kindergarten_id = ? ORDER BY sort LIMIT 1')
+      .get(req.user.kindergartenId);
+    if (!first) return res.json({ classes: [], class: null });
+    const cls = staffClass(db, req.user, req.query.classId ? parseId(req.query.classId) : first.id);
+    res.json(classPayload(req.user, cls, todayIL()));
   });
 
   // Batch update: one field, many children. Also used for undo (entries carry previous values).
@@ -92,7 +108,7 @@ export function staffRoutes(db) {
       return { childId, columns: fieldToColumns(field, e.value) };
     });
     tx(db, () => parsed.forEach((p) => upsertReport(db, p.childId, date, p.columns, req.user.id)));
-    res.json(classPayload(cls, date));
+    res.json(classPayload(req.user, cls, date));
   });
 
   // Several fields for a single child.
@@ -152,11 +168,71 @@ export function staffRoutes(db) {
   });
 
   r.post('/parent-updates/:id/seen', (req, res) => {
-    const update = db.prepare('SELECT * FROM parent_updates WHERE id = ?').get(parseId(req.params.id));
+    const update = db
+      .prepare(
+        `SELECT pu.id FROM parent_updates pu
+         JOIN children c ON c.id = pu.child_id JOIN classes cl ON cl.id = c.class_id
+         WHERE pu.id = ? AND cl.kindergarten_id = ?`,
+      )
+      .get(parseId(req.params.id), req.user.kindergartenId);
     if (!update) throw new HttpError(404, 'not found');
-    staffChild(db, req.user, update.child_id);
     db.prepare('UPDATE parent_updates SET seen_at = COALESCE(seen_at, ?) WHERE id = ?').run(Date.now(), update.id);
     res.json({ ok: true });
+  });
+
+  // General kindergarten information shown to parents.
+  r.put('/kindergarten', (req, res) => {
+    const { hours, phone, notice } = req.body ?? {};
+    db.prepare('UPDATE kindergartens SET hours = ?, phone = ?, notice = ? WHERE id = ?').run(
+      cleanText(hours),
+      cleanText(phone),
+      cleanText(notice),
+      req.user.kindergartenId,
+    );
+    res.json({ kindergarten: kindergartenInfo(db, req.user.kindergartenId) });
+  });
+
+  // Vacation calendar.
+  r.put('/vacations/settings', (req, res) => {
+    const { schoolYear, summerStart } = parseVacationSettings(req.body);
+    db.prepare('UPDATE kindergartens SET school_year = ?, summer_start = ? WHERE id = ?').run(
+      schoolYear,
+      summerStart,
+      req.user.kindergartenId,
+    );
+    res.json(vacationSchedule(db, req.user.kindergartenId));
+  });
+
+  r.post('/vacations', (req, res) => {
+    const v = parseVacation(req.body);
+    db.prepare(
+      `INSERT INTO vacations (kindergarten_id, name, type, start_date, end_date, return_date, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(req.user.kindergartenId, v.name, v.type, v.startDate, v.endDate, v.returnDate, v.note);
+    res.status(201).json(vacationSchedule(db, req.user.kindergartenId));
+  });
+
+  r.put('/vacations/:id', (req, res) => {
+    const current = staffVacation(db, req.user, parseId(req.params.id));
+    const v = parseVacation(req.body);
+    // Custom wording (e.g. '11.09 + 13.09') only holds while the dates it describes are unchanged.
+    const keepWording = v.startDate === current.start_date && v.endDate === current.end_date;
+    db.prepare(
+      `UPDATE vacations SET name = ?, type = ?, start_date = ?, end_date = ?, return_date = ?, note = ?,
+         display_date = ?, weekdays = ?
+       WHERE id = ? AND kindergarten_id = ?`,
+    ).run(
+      v.name, v.type, v.startDate, v.endDate, v.returnDate, v.note,
+      keepWording ? current.display_date : null, keepWording ? current.weekdays : null,
+      current.id, req.user.kindergartenId,
+    );
+    res.json(vacationSchedule(db, req.user.kindergartenId));
+  });
+
+  r.delete('/vacations/:id', (req, res) => {
+    const current = staffVacation(db, req.user, parseId(req.params.id));
+    db.prepare('DELETE FROM vacations WHERE id = ? AND kindergarten_id = ?').run(current.id, req.user.kindergartenId);
+    res.json(vacationSchedule(db, req.user.kindergartenId));
   });
 
   return r;

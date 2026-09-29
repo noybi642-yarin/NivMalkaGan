@@ -1,16 +1,27 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
 import { ErrorState, IconButton, Loading, Shell, toast } from '../shared/ui.jsx';
 import TodayScreen from './TodayScreen.jsx';
 import ChildrenScreen from './ChildrenScreen.jsx';
 import ClassDayScreen from './ClassDayScreen.jsx';
 import ChildSheet from './ChildSheet.jsx';
+import StaffVacations from './StaffVacations.jsx';
 
 const TABS = [
   { key: 'today', label: 'היום', icon: 'today' },
   { key: 'children', label: 'הילדים', icon: 'children' },
   { key: 'gan', label: 'הגן', icon: 'gan' },
+  { key: 'vacations', label: 'לוח חופשות', icon: 'calendar' },
 ];
+
+const CLASS_KEY = 'gan:class';
+function storedClass() {
+  try {
+    return Number(localStorage.getItem(CLASS_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
 
 /** Applies a field value to a local report so the UI responds instantly. */
 function localReport(report, field, value) {
@@ -25,8 +36,22 @@ function localReport(report, field, value) {
 
 export default function TeacherApp({ user, onLogout }) {
   const [tab, setTab] = useState('today');
-  const [classId, setClassId] = useState(null);
+  const [classId, setClassId] = useState(storedClass);
   const { data, setData, error, reload } = useLoad(`/staff/today${classId ? `?classId=${classId}` : ''}`);
+
+  useEffect(() => {
+    try {
+      if (classId) localStorage.setItem(CLASS_KEY, String(classId));
+      else localStorage.removeItem(CLASS_KEY);
+    } catch {
+      /* private mode — nothing to remember */
+    }
+  }, [classId]);
+
+  // A remembered class that no longer exists falls back to the first class.
+  useEffect(() => {
+    if (error?.status === 404 && classId) setClassId(null);
+  }, [error, classId]);
   const [openChildId, setOpenChildId] = useState(null);
 
   const updateChildren = useCallback(
@@ -119,12 +144,15 @@ export default function TeacherApp({ user, onLogout }) {
 
   const logoutButton = <IconButton icon="logout" label="יציאה" onClick={onLogout} />;
 
+  if (tab === 'vacations') {
+    return <Shell tabs={TABS} tab={tab} onTab={setTab}><StaffVacations logoutButton={logoutButton} /></Shell>;
+  }
   if (error) return <Shell tabs={TABS} tab={tab} onTab={setTab}><ErrorState onRetry={reload} /></Shell>;
   if (!data) return <Shell tabs={TABS} tab={tab} onTab={setTab}><Loading /></Shell>;
   if (!data.class) {
     return (
       <Shell tabs={TABS} tab={tab} onTab={setTab}>
-        <div className="empty"><p>עוד לא שויכת לכיתה. פנו להנהלת הגן.</p>{logoutButton}</div>
+        <div className="empty"><p>עוד אין כיתות בגן.</p>{logoutButton}</div>
       </Shell>
     );
   }
@@ -135,13 +163,17 @@ export default function TeacherApp({ user, onLogout }) {
   const openIndex = children.findIndex((c) => c.id === openChildId);
   const openChild = openIndex > -1 ? children[openIndex] : null;
 
-  const common = { data, user, onOpenChild: setOpenChildId, logoutButton, classId: data.class.id, onClass: setClassId };
+  // The open class's percentage follows local edits; the others come from the last load.
+  const livePct = present.length ? Math.round(((present.length - pending) / present.length) * 100) : 100;
+  const classes = data.classes.map((c) => (c.id === data.class.id ? { ...c, pct: livePct } : c));
+  const classSwitcher = <ClassSwitcher classes={classes} value={data.class.id} onChange={setClassId} />;
+  const common = { data, user, onOpenChild: setOpenChildId, logoutButton, classSwitcher };
 
   return (
     <Shell tabs={TABS.map((t) => (t.key === 'children' && pending ? { ...t, badge: pending } : t))} tab={tab} onTab={setTab}>
-      {tab === 'today' && <TodayScreen {...common} applyField={applyField} patchChild={patchChild} markSeen={markSeen} />}
+      {tab === 'today' && <TodayScreen key={data.class.id} {...common} applyField={applyField} patchChild={patchChild} markSeen={markSeen} />}
       {tab === 'children' && <ChildrenScreen {...common} />}
-      {tab === 'gan' && <ClassDayScreen {...common} saveDay={saveDay} />}
+      {tab === 'gan' && <ClassDayScreen key={data.class.id} {...common} saveDay={saveDay} />}
 
       {openChild && (
         <ChildSheet
@@ -157,6 +189,21 @@ export default function TeacherApp({ user, onLogout }) {
         />
       )}
     </Shell>
+  );
+}
+
+/** All classes of the kindergarten, with how much of today is already updated. */
+function ClassSwitcher({ classes, value, onChange }) {
+  if (classes.length < 2) return null;
+  return (
+    <div className="class-switch" role="tablist" aria-label="כיתה">
+      {classes.map((c) => (
+        <button key={c.id} role="tab" aria-selected={c.id === value} className={c.id === value ? 'is-on' : ''}
+          onClick={() => onChange(c.id)}>
+          {c.name} <small>{c.pct}%</small>
+        </button>
+      ))}
+    </div>
   );
 }
 

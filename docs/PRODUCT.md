@@ -15,7 +15,7 @@ requirements → information architecture → data model & permissions → flows
 |---|---|---|
 | Staff (גננת / סייעת) | Record food, sleep, bowel movement, mood for ~12–20 kids; add a personal moment when there is one | ≤ 5 min per class |
 | Parent | "How was my child's day?" + "What do I need to bring tomorrow?" | ≤ 10 sec to understand |
-| Manager | "Are the updates getting done? Is anything waiting on me?" | One glance |
+| Owner (same staff role) | "Are the updates getting done?" — completion per class | One glance |
 
 Key observation: in a typical class **most children have the same answer** for each field
 (everyone ate lunch, everyone napped roughly 12:30–14:30). The data entry problem is therefore
@@ -23,36 +23,44 @@ not a *form* problem — it is an *exceptions* problem. The UI is built around t
 
 ## 2. Information architecture
 
-Three role-specific apps, each with exactly three tabs. The role is decided by the login;
-there is no role switcher.
+Two roles, each with its own app. The role is decided by the account; the login screen has two
+entrances ("כניסת הורים" / "כניסת צוות הגן") and an account only opens through its own entrance.
+Teachers and the kindergarten owner share the staff role — same login, screens and permissions.
 
 ```
-Staff                         Parent                        Manager
-├─ היום   (field-by-field      ├─ היום   (the child's day)   ├─ היום     (הגן שלי overview)
-│          batch + exceptions)├─ הודעות לגן (עדכון לגן)     ├─ הכיתות   (read-only class drill-down)
-├─ הילדים (per-child status,   └─ הילד/ה שלי (info +          └─ ניהול    (structure: classes, staff)
-│          highlight, supplies)            recent days)
-└─ הגן    (menu + activities,
-           entered once per class)
+Staff (צוות הגן)                          Parents (הורים)
+├─ היום   field-by-field batch +          ├─ היום        the child's day + message from the gan
+│         exceptions, any class           ├─ הודעות לגן  structured morning update
+├─ הילדים per-child status, highlight,    ├─ הילד/ה שלי  kindergarten info + recent days
+│         supplies                        └─ לוח חופשות  vacation calendar (read-only)
+├─ הגן    menu + activities per class,
+│         general info for parents
+└─ לוח חופשות  add / edit / delete vacations
 ```
+
+A class switcher ("תינוקייה 86% · צעירים 27% · בוגרים 79%") sits at the top of the staff screens:
+it lets any staff member work on any class and doubles as the owner's completion overview.
+A parent linked to several children gets a child switcher.
 
 ## 3. Data model
 
 ```
 kindergartens ─┬─ classes ─┬─ children ─┬─ daily_reports      (child × date)
-               │           │            ├─ supply_requests    (child × date, open/done)
-               │           │            └─ parent_updates     (child × date, seen/unseen)
-               │           ├─ class_days (class × date: menu, activities)
-               │           └─ staff_classes ── users(role=staff)
-               └─ users (role = parent | staff | manager)
-                     parent_children ── children
+ (general info,│           │            ├─ supply_requests    (child × date, open/done)
+  school year, │           │            └─ parent_updates     (child × date, seen/unseen)
+  summer date) │           └─ class_days (class × date: menu, activities)
+               ├─ vacations
+               └─ users (role = staff | parent)
+                     parent_children ── children   (a parent ↔ one or more children)
 sessions (hashed tokens → users)
 ```
 
 | Table | Notes |
 |---|---|
-| `daily_reports` | `absent`, `food` (all/most/little/none), `sleep_status` (slept/none) + `sleep_start`/`sleep_end`, `poop` (yes/no), `mood` (great/good/hard), `highlight`, `note`. One row per child per day, upserted field-by-field. |
+| `kindergartens` | Root of all data. Holds the general info parents see (hours, phone, notice), the school year and the summer start. Everything else is reachable only through a `kindergarten_id`, so more kindergartens can be added later without changing the model. |
+| `daily_reports` | `absent`, `food` (all/most/little/none), `sleep_status` (slept/none) + `sleep_start`/`sleep_end`, `poop` (yes/no), `mood` (great/good/hard), `highlight` (רגע קטן מהיום — observations and milestones), `note` (כדאי לדעת). One row per child per day, upserted field-by-field. |
 | `class_days` | Menu (בוקר / צהריים) and activities — entered **once** per class, shown to every parent in that class. |
+| `vacations` | Name, type (holiday / staff_day / short_day), start/end/return dates, note. Display wording and weekdays are derived from the dates; optional overrides keep official wording such as "11.09 + 13.09". |
 | `supply_requests` | One row per child per day with a list of items. Parent marks "טופל ✓"; staff sees it. Open requests stay visible until handled. |
 | `parent_updates` | Structured morning updates (fixed options + optional short note). Staff marks "ראיתי" and the parent sees "הגן ראה ✓". Not a chat. |
 | `children.gender` | Used only to render correct Hebrew grammar ("אכלה" / "אכל"). |
@@ -62,17 +70,19 @@ Children marked absent are excluded from completion percentages.
 
 ## 4. Permissions
 
-Enforced on the server for every request (the client never decides access):
+Authorization is part of the data access itself (`server/access.js`): every query for a child,
+class, report or vacation joins through the requesting user's scope, so out-of-scope rows are
+never read. Ids sent by the client are never trusted on their own; out-of-scope ids return 404.
 
 | Role | Can read | Can write |
 |---|---|---|
-| Parent | Only children linked in `parent_children`; that child's report, the child's class menu/activities, the child's supply requests and own updates | Parent updates for own child; mark own child's supply request as handled |
-| Staff | Only children in classes linked in `staff_classes` | Reports, supplies, class day, "seen" on parent updates — for those classes only |
-| Manager | Everything in own kindergarten (aggregate + read-only drill-down) | Nothing child-level (read-only by design) |
+| Staff | Every class and child whose class belongs to their kindergarten; the kindergarten's info and vacations | Reports, supplies, menus/activities, general info, vacation calendar, "seen" on parent updates — all within their kindergarten |
+| Parent | Only children linked in `parent_children`; each child's report, class menu/activities and supply requests; their kindergarten's general info and vacation calendar | Parent updates for their own children; mark their own child's supply request as handled |
 
 Authentication: phone + password, scrypt hashes, random 256-bit session tokens stored only as
-SHA-256 hashes, `HttpOnly` + `SameSite=Lax` (+ `Secure` in production) cookie, login rate limiting,
-a required custom header on all mutating requests (CSRF), strict input validation, and no child photos.
+SHA-256 hashes, `HttpOnly` + `SameSite=Lax` (+ `Secure` in production) cookie, rate limiting of
+failed logins, a required custom header on all mutating requests (CSRF), strict input validation,
+and no child photos. The child's name is never a credential.
 
 ## 5. Core flows
 
@@ -103,11 +113,6 @@ The first card answers the question: mood + the personal highlight. Then a short
 (food with the day's menu, sleep duration, bowel movement, activities). Then anything that
 needs action: "למחר" with a single "טופל ✓" button.
 
-### Manager — one glance
-
-Present today, updates complete, open supply requests, items needing attention,
-and completion per class ("צעירים — 100% עודכנו").
-
 ## 6. What was simplified away (on purpose)
 
 - **No per-meal food tracking.** One food value ("the main meal"), shown to parents next to the lunch menu.
@@ -115,5 +120,5 @@ and completion per class ("צעירים — 100% עודכנו").
 - **No chat / threads / read receipts beyond "ראיתי".** Parent updates are structured options.
 - **No push notifications, calendars, photos, reports, or history analytics.**
 - **No user management UI.** Accounts are provisioned at onboarding (seed script for the demo).
-- **Manager is read-only.** Managers monitor; staff document.
+- **One staff role.** Teachers and the owner share it; completion per class replaces a separate manager dashboard.
 - **No separate "publish" step.** Parents see updates as they are entered — one less action for staff.

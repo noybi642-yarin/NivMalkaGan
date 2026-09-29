@@ -3,7 +3,7 @@ import { formatDay, greeting, supplySentence } from '../shared/copy.js';
 import { ErrorState, Icon, Loading, toast } from '../shared/ui.jsx';
 import DaySummary, { absentText } from './DaySummary.jsx';
 
-export default function ParentToday({ user, child, logoutButton, switcher, goTo }) {
+export default function ParentToday({ child, familyName, kindergarten, logoutButton, switcher, goTo }) {
   const { data, setData, error, reload } = useLoad(`/parent/children/${child.id}/day`);
 
   async function markDone(supply) {
@@ -20,7 +20,7 @@ export default function ParentToday({ user, child, logoutButton, switcher, goTo 
   const header = (
     <header className="parent-header">
       <div className="parent-header-top">
-        <p className="greeting">{greeting()}, {user.name}</p>
+        <p className="greeting">{greeting()}, {familyName} 👋</p>
         {logoutButton}
       </div>
       {switcher}
@@ -41,6 +41,13 @@ export default function ParentToday({ user, child, logoutButton, switcher, goTo 
   return (
     <>
       {header}
+
+      {kindergarten?.notice && (
+        <section className="card card-notice">
+          <span aria-hidden="true">📣</span>
+          <p><strong>מהגן: </strong>{kindergarten.notice}</p>
+        </section>
+      )}
 
       {report.absent ? (
         <section className="card empty-day"><p>{absentText(child)}</p></section>

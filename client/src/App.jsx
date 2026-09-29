@@ -4,9 +4,8 @@ import { Toaster } from './shared/ui.jsx';
 import Login from './Login.jsx';
 import TeacherApp from './teacher/TeacherApp.jsx';
 import ParentApp from './parent/ParentApp.jsx';
-import ManagerApp from './manager/ManagerApp.jsx';
 
-const APPS = { staff: TeacherApp, parent: ParentApp, manager: ManagerApp };
+const APPS = { staff: TeacherApp, parent: ParentApp };
 
 export default function App() {
   const [user, setUser] = useState(undefined);

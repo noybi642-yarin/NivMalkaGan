@@ -99,17 +99,21 @@ export function requireCsrfHeader(req, _res, next) {
   next();
 }
 
-/** Tiny in-memory fixed-window limiter for login attempts. */
+/** Tiny in-memory limiter for failed login attempts (successful logins are not counted). */
 export function loginLimiter({ max = 10, windowMs = 15 * 60 * 1000 } = {}) {
-  const hits = new Map();
-  return (key) => {
-    const now = Date.now();
-    const entry = hits.get(key);
-    if (!entry || entry.reset < now) {
-      hits.set(key, { count: 1, reset: now + windowMs });
-      return true;
-    }
-    entry.count += 1;
-    return entry.count <= max;
+  const failures = new Map();
+  const current = (key) => {
+    const entry = failures.get(key);
+    if (entry && entry.reset < Date.now()) failures.delete(key);
+    return failures.get(key);
+  };
+  return {
+    blocked: (key) => (current(key)?.count ?? 0) >= max,
+    fail: (key) => {
+      const entry = current(key) ?? { count: 0, reset: Date.now() + windowMs };
+      entry.count += 1;
+      failures.set(key, entry);
+    },
+    clear: (key) => failures.delete(key),
   };
 }

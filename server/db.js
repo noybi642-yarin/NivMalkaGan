@@ -5,9 +5,15 @@ import path from 'node:path';
 const SCHEMA = `
 PRAGMA foreign_keys = ON;
 
+-- Every other table hangs off a kindergarten, so more kindergartens can be added later.
 CREATE TABLE IF NOT EXISTS kindergartens (
-  id   INTEGER PRIMARY KEY,
-  name TEXT NOT NULL
+  id           INTEGER PRIMARY KEY,
+  name         TEXT NOT NULL,
+  hours        TEXT,
+  phone        TEXT,
+  notice       TEXT,
+  school_year  TEXT,
+  summer_start TEXT
 );
 
 CREATE TABLE IF NOT EXISTS classes (
@@ -20,16 +26,10 @@ CREATE TABLE IF NOT EXISTS classes (
 CREATE TABLE IF NOT EXISTS users (
   id              INTEGER PRIMARY KEY,
   kindergarten_id INTEGER NOT NULL REFERENCES kindergartens(id),
-  role            TEXT NOT NULL CHECK (role IN ('parent', 'staff', 'manager')),
+  role            TEXT NOT NULL CHECK (role IN ('parent', 'staff')),
   name            TEXT NOT NULL,
   phone           TEXT NOT NULL UNIQUE,
   password_hash   TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS staff_classes (
-  user_id  INTEGER NOT NULL REFERENCES users(id),
-  class_id INTEGER NOT NULL REFERENCES classes(id),
-  PRIMARY KEY (user_id, class_id)
 );
 
 CREATE TABLE IF NOT EXISTS children (
@@ -101,16 +101,39 @@ CREATE TABLE IF NOT EXISTS parent_updates (
   seen_at    INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS vacations (
+  id              INTEGER PRIMARY KEY,
+  kindergarten_id INTEGER NOT NULL REFERENCES kindergartens(id),
+  name            TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK (type IN ('holiday', 'staff_day', 'short_day')),
+  start_date      TEXT NOT NULL,
+  end_date        TEXT NOT NULL,
+  return_date     TEXT,
+  note            TEXT,
+  -- Optional wording overrides, e.g. '11.09 + 13.09' when Shabbat falls inside the range.
+  display_date    TEXT,
+  weekdays        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_vacations_kg ON vacations(kindergarten_id, start_date);
 CREATE INDEX IF NOT EXISTS idx_children_class ON children(class_id);
 CREATE INDEX IF NOT EXISTS idx_reports_date ON daily_reports(date);
 CREATE INDEX IF NOT EXISTS idx_supplies_child ON supply_requests(child_id, status);
 CREATE INDEX IF NOT EXISTS idx_updates_child_date ON parent_updates(child_id, date);
 `;
 
+const SCHEMA_VERSION = 2;
+
 export function openDb(file = process.env.DB_PATH || path.resolve('data/gan.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
+  const version = db.prepare('PRAGMA user_version').get().user_version;
+  const hasTables = db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table'`).get().n > 0;
+  if (hasTables && version !== SCHEMA_VERSION) {
+    throw new Error(`Database ${file} uses an older schema. Run \`npm run seed\` to recreate it.`);
+  }
   db.exec(SCHEMA);
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   return db;
 }
 

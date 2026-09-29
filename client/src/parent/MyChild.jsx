@@ -4,7 +4,7 @@ import { MOOD, childWord, foodSentence, formatDayShort, sleepSentence } from '..
 import { Loading, PageHeader } from '../shared/ui.jsx';
 import DaySummary, { absentText } from './DaySummary.jsx';
 
-export default function MyChild({ child, logoutButton, switcher }) {
+export default function MyChild({ child, kindergarten, logoutButton, switcher }) {
   const { data } = useLoad(`/parent/children/${child.id}/history`);
   const [openDate, setOpenDate] = useState(null);
 
@@ -20,6 +20,16 @@ export default function MyChild({ child, logoutButton, switcher }) {
           <p className="muted">{child.className} · {child.kindergartenName}</p>
         </div>
       </section>
+
+      {kindergarten && (kindergarten.hours || kindergarten.phone) && (
+        <section className="card gan-info">
+          <h2 className="card-title">{kindergarten.name}</h2>
+          {kindergarten.hours && <p><span className="muted">שעות פעילות: </span>{kindergarten.hours}</p>}
+          {kindergarten.phone && (
+            <p><span className="muted">טלפון: </span><a href={`tel:${kindergarten.phone.replace(/[^\d+]/g, '')}`} dir="ltr">{kindergarten.phone}</a></p>
+          )}
+        </section>
+      )}
 
       <h2 className="section-title">הימים האחרונים</h2>
       {!data ? <Loading /> : data.days.length === 0 ? (
