@@ -8,7 +8,7 @@ import { addDays, todayIL } from './domain.js';
 
 export const DEMO_PASSWORD = 'gan12345';
 export const DEMO_ACCOUNTS = {
-  staff: { username: 'michal', name: 'מיכל' },
+  staff: { username: 'dana', name: 'דנה' },
   parent: { username: 'noy', name: 'נוי' },
 };
 
@@ -37,7 +37,7 @@ const CLASSES = [
   },
   {
     name: 'צעירים',
-    staff: [['מיכל', DEMO_ACCOUNTS.staff.username], ['סיוון', 'sivan']],
+    staff: [[DEMO_ACCOUNTS.staff.name, DEMO_ACCOUNTS.staff.username], ['סיוון', 'sivan']],
     children: [
       ['ניב', 'f'], ['יואב', 'm'], ['מאיה', 'f'], ['איתי', 'm'], ['נועה', 'f'], ['אריאל', 'm'],
       ['תמר', 'f'], ['עומר', 'm'], ['ליה', 'f'], ['אלון', 'm'], ['שירה', 'f'], ['דניאל', 'm'],
@@ -111,8 +111,8 @@ export function seed(db, today = todayIL()) {
     const noy = user('parent', DEMO_ACCOUNTS.parent.name, DEMO_ACCOUNTS.parent.username);
     link(noy, 'ניב');
     link(noy, 'אלה'); // Niv's little sister, so the demo shows the child switcher
-    const dana = user('parent', 'דנה', 'dana');
-    link(dana, 'יואב');
+    const rotem = user('parent', 'רותם', 'rotem');
+    link(rotem, 'יואב');
     const shani = user('parent', 'שני', 'shani');
     link(shani, 'מאיה');
 
@@ -152,7 +152,7 @@ export function seed(db, today = todayIL()) {
     report('נועה', today, { food_lunch: 'well' });
     report('דניאל', today, { absent: 1 });
     supply('ניב', today, ['wipes']);
-    parentUpdate(dana, 'יואב', ['early_pickup'], 'אבא יגיע ב-13:30');
+    parentUpdate(rotem, 'יואב', ['early_pickup'], 'אבא יגיע ב-13:30');
     parentUpdate(shani, 'מאיה', ['other_pickup'], 'סבתא רותי תאסוף היום', true);
 
     // --- Other classes, so the class overview has something real to show.

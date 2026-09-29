@@ -51,7 +51,7 @@ Password for all: `gan12345` (the login screen also has one-tap demo buttons).
 | Entrance | Name | Username |
 |---|---|---|
 | כניסת הורים | נוי (parent of ניב and אלה) | `noy` |
-| כניסת צוות הגן | מיכל (teacher) | `michal` |
+| כניסת צוות הגן | דנה (teacher) | `dana` |
 | כניסת צוות הגן | אורית (owner — same role as teachers) | `orit` |
 
 ## Structure

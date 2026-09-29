@@ -54,7 +54,11 @@ export default function TeacherApp({ user, onLogout }) {
     if (error?.status === 404 && classId) setClassId(null);
   }, [error, classId]);
 
-  useEffect(() => window.scrollTo(0, 0), [tab, screen]);
+  // Braces matter: an effect's return value is treated as its cleanup. Newer browsers return a Promise
+  // from scrollTo, which React would later try to call — crashing every staff navigation.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab, screen]);
 
   const updateChildren = useCallback(
     (fn) => setData((d) => (d ? { ...d, children: d.children.map(fn) } : d)),
