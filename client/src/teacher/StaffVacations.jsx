@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
-import { ErrorState, Icon, Loading, PageHeader, Segmented, Sheet, toast } from '../shared/ui.jsx';
+import { ErrorState, Icon, Loading, TopBar, Segmented, Sheet, toast } from '../shared/ui.jsx';
 import VacationList from '../shared/VacationList.jsx';
 
 const TYPES = [
@@ -11,7 +11,7 @@ const TYPES = [
 
 const EMPTY = { name: '', type: 'holiday', startDate: '', endDate: '', returnDate: '', note: '' };
 
-export default function StaffVacations({ logoutButton }) {
+export default function StaffVacations({ place, logoutButton }) {
   const { data, setData, error, reload } = useLoad('/vacations');
   const [editing, setEditing] = useState(null); // vacation form values, or null
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -32,7 +32,11 @@ export default function StaffVacations({ logoutButton }) {
 
   return (
     <>
-      <PageHeader title={data.title} subtitle={data.subtitle} action={logoutButton} />
+      <TopBar place={place} title="לוח חופשות" action={logoutButton} />
+      <section className="hello">
+        <h1>{data.title} <span aria-hidden="true">☀️</span></h1>
+        <p className="muted">{data.subtitle}</p>
+      </section>
       <div className="page-pad vacation-actions">
         <button className="btn btn-soft" onClick={() => setEditing(EMPTY)}>
           <Icon name="plus" size={18} /> הוספת חופשה

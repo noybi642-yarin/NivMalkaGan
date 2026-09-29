@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { FIELDS, formatDay, parentUpdateText, sleepShort } from '../shared/copy.js';
-import { Icon, PageHeader, Progress, Segmented, Sheet } from '../shared/ui.jsx';
+import { FIELDS, sleepShort } from '../shared/copy.js';
+import { Icon, Segmented, Sheet, TopBar } from '../shared/ui.jsx';
 import SleepEditor from './SleepEditor.jsx';
 
 /** Most common sleep window already entered today — the smart default for the batch. */
@@ -16,7 +16,8 @@ function commonSleep(children) {
   return { start, end };
 }
 
-export default function TodayScreen({ data, applyField, patchChild, markSeen, onOpenChild, logoutButton, classSwitcher }) {
+/** עדכון מהיר לקבוצה: one field at a time for the whole group, then the exceptions. */
+export default function TodayScreen({ data, place, applyField, patchChild, onOpenChild, onBack, classSwitcher }) {
   const [fieldKey, setFieldKey] = useState('food');
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
@@ -30,7 +31,6 @@ export default function TodayScreen({ data, applyField, patchChild, markSeen, on
   const unset = present.filter((c) => c.report[fieldKey] == null);
   const sleepDefaults = commonSleep(present);
 
-  const unseen = data.children.flatMap((c) => c.parentUpdates.filter((u) => !u.seen).map((u) => ({ ...u, child: c })));
 
   // Smart default target: whoever isn't set yet, so batching never overwrites an exception.
   let targets;
@@ -66,37 +66,18 @@ export default function TodayScreen({ data, applyField, patchChild, markSeen, on
 
   return (
     <>
-      <PageHeader
-        title={formatDay(data.date)}
-        subtitle={`${data.class.name} · ${complete} מתוך ${present.length} עודכנו`}
-        action={logoutButton}
-      />
+      <TopBar place={place} title="עדכון מהיר לקבוצה" onBack={onBack} />
       {classSwitcher}
-      <div className="page-pad">
-        <Progress value={complete} total={present.length} />
-      </div>
-
-      {unseen.length > 0 && (
-        <section className="card card-warm parent-notes" aria-label="הודעות מההורים">
-          <h2 className="card-title">הודעות מההורים הבוקר</h2>
-          {unseen.map((u) => (
-            <div className="parent-note" key={u.id}>
-              <div>
-                <strong>{u.child.name}</strong> · {parentUpdateText(u, u.child.gender)}
-                {u.note && <p className="muted">{u.note}</p>}
-              </div>
-              <button className="btn btn-small" onClick={() => markSeen(u.id)}>ראיתי</button>
-            </div>
-          ))}
-        </section>
-      )}
+      <p className="page-pad muted">
+        {data.class.name} · {present.length - complete ? `${present.length - complete} ממתינים לעדכון` : 'כולם עודכנו'}
+      </p>
 
       {allDone && (
         <section className="card card-done">
           <span className="done-icon"><Icon name="check" /></span>
           <div>
             <strong>כל הילדים עודכנו</strong>
-            <p className="muted">ההורים כבר רואים את היום. אפשר להוסיף רגע קטן בלשונית הילדים.</p>
+            <p className="muted">ההורים כבר רואים את היום. אפשר להוסיף "משהו חדש שעשיתי" בעדכון האישי של כל ילד/ה.</p>
           </div>
         </section>
       )}
@@ -176,7 +157,7 @@ export default function TodayScreen({ data, applyField, patchChild, markSeen, on
           ))}
         </section>
       )}
-      <p className="hint">כדי לסמן ילד/ה שלא הגיע/ה — לוחצים על השם</p>
+      <p className="hint">לחיצה על שם פותחת את העדכון האישי — שם גם מסמנים מי לא הגיע/ה</p>
 
       <Sheet open={Boolean(sleepChild)} onClose={() => setSleepChildId(null)} label="שינה">
         {sleepChild && (

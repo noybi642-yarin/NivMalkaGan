@@ -1,57 +1,76 @@
 import { useState } from 'react';
-import { FIELDS, formatDay, g, supplyLabels } from '../shared/copy.js';
-import { Chip, PageHeader } from '../shared/ui.jsx';
+import { MOOD, childStatus, foodLabel, g, statusLabel, supplyLabels } from '../shared/copy.js';
+import { Avatar, StatusPill, TopBar } from '../shared/ui.jsx';
 
-export default function ChildrenScreen({ data, onOpenChild, logoutButton, classSwitcher }) {
-  const [onlyMissing, setOnlyMissing] = useState(false);
-  const list = data.children.filter((c) => !onlyMissing || (!c.report.absent && !c.report.complete));
-  const missing = data.children.filter((c) => !c.report.absent && !c.report.complete).length;
+const FILTERS = [
+  { key: 'all', label: 'הכל' },
+  { key: 'pending', label: 'ממתינים לעדכון' },
+  { key: 'done', label: 'עודכנו' },
+  { key: 'absent', label: 'נעדרים' },
+];
+
+export default function ChildrenScreen({ data, place, logoutButton, classSwitcher, onOpenChild }) {
+  const [filter, setFilter] = useState('all');
+  const withStatus = data.children.map((c) => ({ ...c, status: childStatus(c.report) }));
+  const count = (key) => (key === 'all' ? withStatus.length : withStatus.filter((c) => c.status === key).length);
+  const list = withStatus.filter((c) => filter === 'all' || c.status === filter);
 
   return (
     <>
-      <PageHeader title="הילדים" subtitle={`${data.class.name} · ${formatDay(data.date)}`} action={logoutButton} />
+      <TopBar place={place} title="ילדי הגן" action={logoutButton} />
+      <section className="hello">
+        <h1>הילדים שלנו <span aria-hidden="true">🌈</span></h1>
+        <p className="muted">{data.class.name} · {data.children.length} ילדים</p>
+      </section>
       {classSwitcher}
-      <div className="page-pad chips">
-        <Chip on={!onlyMissing} onClick={() => setOnlyMissing(false)}>כולם</Chip>
-        <Chip on={onlyMissing} onClick={() => setOnlyMissing(true)}>חסר עדכון ({missing})</Chip>
+
+      <div className="filter-row" role="tablist" aria-label="סינון">
+        {FILTERS.map((f) => (
+          <button key={f.key} role="tab" aria-selected={filter === f.key} className={filter === f.key ? 'is-on' : ''}
+            onClick={() => setFilter(f.key)}>
+            {f.label} <small>{count(f.key)}</small>
+          </button>
+        ))}
       </div>
 
-      {list.length === 0 && <div className="empty"><p>כל הילדים עודכנו ✓</p></div>}
+      {list.length === 0 && <div className="empty"><p>אין ילדים ברשימה הזו ✓</p></div>}
 
       <ul className="child-cards">
         {list.map((c) => {
+          const mood = MOOD.find((m) => m.value === c.report.mood);
           const openSupply = c.supplies.find((s) => s.status === 'open');
-          const doneSupply = c.supplies.find((s) => s.date === data.date && s.status === 'done');
           return (
-            <li key={c.id}>
-              <button className={`card child-card${c.report.absent ? ' is-absent' : ''}`} onClick={() => onOpenChild(c.id)}>
-                <div className="child-card-top">
+            <li key={c.id} className={`card child-card is-${c.status}`}>
+              <button className="child-card-head" onClick={() => onOpenChild(c.id)}>
+                <Avatar name={c.name} />
+                <span className="child-card-name">
                   <strong>{c.name}</strong>
-                  {c.report.absent ? (
-                    <span className="tag">{g(c.gender, 'לא הגיע', 'לא הגיעה')}</span>
-                  ) : (
-                    <span className="field-dots" aria-label="סטטוס עדכון">
-                      {FIELDS.map((f) => (
-                        <span key={f.key} className={`field-dot${c.report[f.key] ? ' is-set' : ''}`} title={f.label}>
-                          {f.icon}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </div>
-                {!c.report.absent && (
-                  <p className={c.report.highlight ? 'highlight-snippet' : 'add-moment'}>
-                    {c.report.highlight ? `✨ ${c.report.highlight}` : '+ רגע קטן מהיום'}
-                  </p>
-                )}
-                {(openSupply || doneSupply || c.report.note) && (
-                  <div className="child-card-tags">
-                    {c.report.note && <span className="tag tag-warn">כדאי לדעת</span>}
-                    {openSupply && <span className="tag tag-accent">חסר: {supplyLabels(openSupply).join(', ')}</span>}
-                    {doneSupply && !openSupply && <span className="tag tag-ok">ציוד: טופל ✓</span>}
-                  </div>
-                )}
+                  {c.parentUpdates.some((u) => !u.seen) && <span className="muted small">💌 הודעה מההורים</span>}
+                </span>
+                <StatusPill status={c.status}>{statusLabel(c.status, c.gender)}</StatusPill>
               </button>
+
+              {(mood || c.report.food) && c.status !== 'absent' && (
+                <div className="snapshot">
+                  {mood && <span>{mood.emoji} {mood.label}</span>}
+                  {c.report.food && <span>🍽️ {foodLabel(c.report.food, c.gender)}</span>}
+                </div>
+              )}
+              {c.report.highlight && <p className="snapshot-line lilac">🌟 {c.report.highlight}</p>}
+              {c.report.note && <p className="snapshot-line butter">💛 {c.report.note}</p>}
+              {openSupply && <p className="snapshot-line peach">🎒 חסר: {supplyLabels(openSupply).join(', ')}</p>}
+
+              {c.status === 'pending' && (
+                <button className="btn btn-primary btn-block" onClick={() => onOpenChild(c.id)}>
+                  + עדכון יומי ל{c.name}
+                </button>
+              )}
+              {c.status === 'done' && (
+                <button className="btn btn-quiet" onClick={() => onOpenChild(c.id)}>עריכה</button>
+              )}
+              {c.status === 'absent' && (
+                <button className="btn btn-quiet" onClick={() => onOpenChild(c.id)}>{g(c.gender, 'הגיע בכל זאת?', 'הגיעה בכל זאת?')}</button>
+              )}
             </li>
           );
         })}

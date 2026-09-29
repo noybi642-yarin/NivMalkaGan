@@ -3,6 +3,12 @@ import { Icon } from './ui.jsx';
 
 const SOON_DAYS = 7;
 
+const HOLIDAY_EMOJI = [
+  ['ראש השנה', '🍎'], ['כיפור', '🕊️'], ['שמחת תורה', '🍋'], ['סוכות', '🌿'], ['חנוכה', '🕎'], ['פורים', '🎭'],
+  ['פסח', '🍷'], ['הזיכרון', '🕯️'], ['העצמאות', '🇮🇱'], ['שבועות', '🌾'], ['צוות', '📚'],
+];
+const holidayEmoji = (name) => HOLIDAY_EMOJI.find(([key]) => name.includes(key))?.[1] ?? '🗓️';
+
 const todayIL = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
 const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 
@@ -32,18 +38,22 @@ export default function VacationList({ schedule, onEdit }) {
           const body = (
             <>
               <div className="vacation-top">
-                <h2>{item.name}</h2>
-                {label && <span className={`tag${status === 'during' ? ' tag-warn' : ''}`}>{label}</span>}
+                <span className="vacation-emoji" aria-hidden="true">{holidayEmoji(item.name)}</span>
+                <div className="vacation-title">
+                  <h2>{item.name}</h2>
+                  <p className="vacation-when">
+                    <strong>{ltr(item.displayDate)}</strong>
+                    <span className="muted"> · {item.weekdays}</span>
+                  </p>
+                </div>
+                {label && <span className={`pill ${status === 'during' ? 'pill-pending' : 'pill-soft'}`}>{label}</span>}
                 {onEdit && <span className="vacation-edit"><Icon name="edit" size={18} /></span>}
               </div>
-              <p className="vacation-when">
-                <strong>{ltr(item.displayDate)}</strong>
-                <span className="muted"> · {item.weekdays}</span>
-              </p>
-              <p className="vacation-return">
-                <span className={`vacation-dot${item.type === 'short_day' ? ' is-short' : ''}`} aria-hidden="true" />
-                {item.type === 'short_day' ? item.note : `חזרה לגן: ${item.returnDay}, ${item.returnDate}`}
-              </p>
+              {item.type === 'short_day' ? (
+                <p className="vacation-return is-short"><span aria-hidden="true">🕐</span> {item.note}</p>
+              ) : (
+                <p className="vacation-return"><span aria-hidden="true">👋</span> חזרה לגן: {item.returnDay}, {item.returnDate}</p>
+              )}
             </>
           );
           const className = `card vacation${status === 'past' ? ' is-past' : ''}`;
@@ -61,8 +71,9 @@ export default function VacationList({ schedule, onEdit }) {
 
       {schedule.summer && (
         <section className="card vacation-summer">
-          <span aria-hidden="true">☀️</span>
-          <p>{schedule.summer.text}</p>
+          <span className="pill pill-soft">החופש הגדול <span aria-hidden="true">🏖️</span></span>
+          <p className="vacation-summer-text">{schedule.summer.text}</p>
+          <span className="vacation-summer-deco" aria-hidden="true">☀️</span>
         </section>
       )}
     </>

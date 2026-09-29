@@ -8,7 +8,7 @@ import { DEMO_ACCOUNTS, DEMO_PASSWORD, seed } from '../seed.js';
 let server;
 let base;
 let db;
-const OTHER = { staff: '0520000001', parent: '0520000002' };
+const OTHER = { staff: 'other-staff', parent: 'other-parent' };
 
 before(async () => {
   db = openDb(':memory:');
@@ -28,14 +28,14 @@ function addSecondKindergarten() {
   db.prepare(`INSERT INTO children (class_id, name, gender) VALUES (?, 'זר', 'm')`).run(cls);
   db.prepare(`INSERT INTO vacations (kindergarten_id, name, type, start_date, end_date, return_date)
               VALUES (?, 'חופשה אחרת', 'holiday', '2026-11-01', '2026-11-01', '2026-11-02')`).run(kg);
-  const addUser = db.prepare('INSERT INTO users (kindergarten_id, role, name, phone, password_hash) VALUES (?, ?, ?, ?, ?)');
+  const addUser = db.prepare('INSERT INTO users (kindergarten_id, role, name, username, password_hash) VALUES (?, ?, ?, ?, ?)');
   addUser.run(kg, 'staff', 'צוות אחר', OTHER.staff, pw);
   const parent = addUser.run(kg, 'parent', 'הורה אחר', OTHER.parent, pw).lastInsertRowid;
   db.prepare('INSERT INTO parent_children (parent_id, child_id) VALUES (?, ?)').run(parent, childId('זר'));
 }
 
-async function login(phone, password = DEMO_PASSWORD) {
-  const res = await call(null, 'POST', '/auth/login', { phone, password });
+async function login(username, password = DEMO_PASSWORD) {
+  const res = await call(null, 'POST', '/auth/login', { username, password });
   assert.equal(res.status, 200);
   return res.headers.get('set-cookie').split(';')[0];
 }
@@ -56,34 +56,34 @@ function classId(name) {
 }
 
 describe('authentication', () => {
-  test('rejects wrong password and unknown phone the same way', async () => {
-    const a = await call(null, 'POST', '/auth/login', { phone: DEMO_ACCOUNTS.parent.phone, password: 'nope' });
-    const b = await call(null, 'POST', '/auth/login', { phone: '0599999999', password: 'nope' });
+  test('rejects wrong password and unknown username the same way', async () => {
+    const a = await call(null, 'POST', '/auth/login', { username: DEMO_ACCOUNTS.parent.username, password: 'nope' });
+    const b = await call(null, 'POST', '/auth/login', { username: 'nobody', password: 'nope' });
     assert.equal(a.status, 401);
     assert.equal(b.status, 401);
     assert.deepEqual(await a.json(), await b.json());
   });
 
-  test('accepts phone in +972 format and sets an HttpOnly cookie', async () => {
-    const res = await call(null, 'POST', '/auth/login', { phone: '+972-50-000-0001', password: DEMO_PASSWORD });
+  test('usernames ignore case and spaces; session cookie is HttpOnly', async () => {
+    const res = await call(null, 'POST', '/auth/login', { username: ' Noy ', password: DEMO_PASSWORD });
     assert.equal(res.status, 200);
     assert.match(res.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
   });
 
   test('requires the CSRF header on mutations', async () => {
-    const res = await call(null, 'POST', '/auth/login', { phone: DEMO_ACCOUNTS.parent.phone, password: DEMO_PASSWORD }, {});
+    const res = await call(null, 'POST', '/auth/login', { username: DEMO_ACCOUNTS.parent.username, password: DEMO_PASSWORD }, {});
     assert.equal(res.status, 403);
   });
 
   test('each entrance only opens its own role', async () => {
-    const asStaff = await call(null, 'POST', '/auth/login', { phone: DEMO_ACCOUNTS.parent.phone, password: DEMO_PASSWORD, role: 'staff' });
+    const asStaff = await call(null, 'POST', '/auth/login', { username: DEMO_ACCOUNTS.parent.username, password: DEMO_PASSWORD, role: 'staff' });
     assert.equal(asStaff.status, 401);
-    const asParent = await call(null, 'POST', '/auth/login', { phone: DEMO_ACCOUNTS.parent.phone, password: DEMO_PASSWORD, role: 'parent' });
+    const asParent = await call(null, 'POST', '/auth/login', { username: DEMO_ACCOUNTS.parent.username, password: DEMO_PASSWORD, role: 'parent' });
     assert.equal(asParent.status, 200);
   });
 
   test('logout invalidates the session', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     await call(cookie, 'POST', '/auth/logout');
     assert.equal((await call(cookie, 'GET', '/me')).status, 401);
   });
@@ -91,26 +91,26 @@ describe('authentication', () => {
 
 describe('parent permissions', () => {
   test('sees only own children', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     const { children } = await (await call(cookie, 'GET', '/parent/children')).json();
     assert.deepEqual(children.map((c) => c.name), ['ניב', 'אלה']);
   });
 
   test("cannot read another family's child", async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     assert.equal((await call(cookie, 'GET', `/parent/children/${childId('יואב')}/day`)).status, 404);
     assert.equal((await call(cookie, 'GET', `/parent/children/${childId('יואב')}/history`)).status, 404);
     assert.equal((await call(cookie, 'POST', `/parent/children/${childId('יואב')}/updates`, { types: ['cold'] })).status, 404);
   });
 
   test("cannot resolve another child's supply request", async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     const other = db.prepare('SELECT id FROM supply_requests WHERE child_id = ?').get(childId('אגם'));
     assert.equal((await call(cookie, 'POST', `/parent/supplies/${other.id}/done`)).status, 404);
   });
 
   test('cannot use staff endpoints, even by editing the request', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     assert.equal((await call(cookie, 'GET', '/staff/today')).status, 403);
     assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('ניב')}/report`, { mood: 'great' })).status, 403);
     assert.equal((await call(cookie, 'POST', '/staff/vacations', {})).status, 403);
@@ -125,12 +125,14 @@ describe('parent permissions', () => {
   });
 
   test('sees the day, marks supplies handled, sends an update', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     const niv = childId('ניב');
     const day = await (await call(cookie, 'GET', `/parent/children/${niv}/day`)).json();
     assert.equal(day.report.mood, 'good');
     assert.equal(day.report.sleep.minutes, 95);
-    assert.deepEqual(day.day.activities, ['חוג מוזיקה']);
+    assert.deepEqual(day.day.activities, ['חוג מוזיקה', 'יצירה', 'חצר']);
+    assert.equal(day.report.activities, null); // null = joined all of today's activities
+    assert.equal(day.menu.lunch, 'קציצות, אורז וירקות');
     const open = day.supplies.find((s) => s.status === 'open');
     const done = await (await call(cookie, 'POST', `/parent/supplies/${open.id}/done`)).json();
     assert.equal(done.supply.status, 'done');
@@ -143,7 +145,7 @@ describe('parent permissions', () => {
 
 describe('staff permissions', () => {
   test('sees every class of the kindergarten, and nothing of another kindergarten', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.staff.phone);
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const today = await (await call(cookie, 'GET', '/staff/today')).json();
     assert.deepEqual(today.classes.map((c) => c.name), ['תינוקייה', 'צעירים', 'בוגרים']);
     const other = await (await call(cookie, 'GET', `/staff/today?classId=${classId('בוגרים')}`)).json();
@@ -157,54 +159,71 @@ describe('staff permissions', () => {
   });
 
   test('batch update applies to one class, rejects children from other classes', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.staff.phone);
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const res = await call(cookie, 'POST', `/staff/classes/${classId('צעירים')}/reports`, {
       field: 'food',
-      entries: [{ childId: childId('יואב'), value: 'all' }, { childId: childId('תמר'), value: 'all' }],
+      entries: [{ childId: childId('יואב'), value: 'well' }, { childId: childId('תמר'), value: 'well' }],
     });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.children.find((c) => c.name === 'תמר').report.food, 'all');
+    assert.equal(body.children.find((c) => c.name === 'תמר').report.food, 'well');
 
     const cross = await call(cookie, 'POST', `/staff/classes/${classId('צעירים')}/reports`, {
       field: 'food',
-      entries: [{ childId: childId('עידו'), value: 'none' }],
+      entries: [{ childId: childId('עידו'), value: 'little' }],
     });
     assert.equal(cross.status, 400);
   });
 
   test('validates sleep times', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.staff.phone);
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const url = `/staff/children/${childId('יואב')}/report`;
     assert.equal((await call(cookie, 'PATCH', url, { sleep: { status: 'slept', start: '14:00', end: '13:00' } })).status, 400);
     const ok = await (await call(cookie, 'PATCH', url, { sleep: { status: 'slept', start: '12:30', end: '14:05' } })).json();
     assert.equal(ok.report.sleep.minutes, 95);
   });
 
+  test("lists today's parent messages of their kindergarten only", async () => {
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
+    const { parentUpdates } = await (await call(cookie, 'GET', '/staff/parent-updates')).json();
+    assert.ok(parentUpdates.length >= 2);
+    assert.ok(parentUpdates.every((u) => u.childName !== 'זר'));
+  });
+
   test('can update any child in the kindergarten', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.staff.phone);
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
     assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('עידו')}/report`, { mood: 'great' })).status, 200);
   });
 
   test('general info reaches parents', async () => {
-    const staff = await login(DEMO_ACCOUNTS.staff.phone);
+    const staff = await login(DEMO_ACCOUNTS.staff.username);
     await call(staff, 'PUT', '/staff/kindergarten', { hours: '07:30–16:00', phone: '03-1111111', notice: 'מחר יום פיג׳מות' });
-    const parent = await login(DEMO_ACCOUNTS.parent.phone);
+    const parent = await login(DEMO_ACCOUNTS.parent.username);
     const { kindergarten } = await (await call(parent, 'GET', '/kindergarten')).json();
     assert.equal(kindergarten.notice, 'מחר יום פיג׳מות');
   });
 
-  test('class day info reaches the parent', async () => {
-    const staff = await login(DEMO_ACCOUNTS.staff.phone);
-    await call(staff, 'PUT', `/staff/classes/${classId('צעירים')}/day`, {
-      menuBreakfast: 'חביתה',
-      menuLunch: 'פסטה',
-      activities: ['יצירה', 'יצירה', 'חצר'],
+  test('menu once for the kindergarten, activities once per class, selection per child', async () => {
+    const staff = await login(DEMO_ACCOUNTS.staff.username);
+    await call(staff, 'PUT', '/staff/menu', { breakfast: 'חביתה', lunch: 'פסטה', snack: null });
+    await call(staff, 'PUT', `/staff/classes/${classId('צעירים')}/day`, { activities: ['יצירה', 'יצירה', 'חצר'] });
+    const saved = await call(staff, 'PATCH', `/staff/children/${childId('ניב')}/report`, {
+      mood: 'great', food: 'well', activities: ['חצר'], highlight: 'טיפסה לבד על המגלשה',
     });
-    const parent = await login(DEMO_ACCOUNTS.parent.phone);
+    assert.equal(saved.status, 200);
+    assert.equal((await call(staff, 'PATCH', `/staff/children/${childId('ניב')}/report`, { food: 'all' })).status, 400);
+
+    const parent = await login(DEMO_ACCOUNTS.parent.username);
     const day = await (await call(parent, 'GET', `/parent/children/${childId('ניב')}/day`)).json();
-    assert.equal(day.day.menuLunch, 'פסטה');
+    assert.equal(day.menu.lunch, 'פסטה');
     assert.deepEqual(day.day.activities, ['יצירה', 'חצר']);
+    assert.deepEqual(day.report.activities, ['חצר']);
+    assert.equal(day.report.food, 'well');
+
+    // Another kindergarten's menu is never visible.
+    const other = await login(OTHER.parent);
+    const foreignDay = await (await call(other, 'GET', `/parent/children/${childId('זר')}/day`)).json();
+    assert.equal(foreignDay.menu.lunch, null);
   });
 });
 
@@ -225,7 +244,7 @@ describe('vacation calendar', () => {
   ];
 
   test('parents get the exact official schedule', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.parent.phone);
+    const cookie = await login(DEMO_ACCOUNTS.parent.username);
     const schedule = await (await call(cookie, 'GET', '/vacations')).json();
     assert.equal(schedule.title, 'לוח חופשות תשפ״ז');
     assert.deepEqual(schedule.items.map((v) => [v.name, v.displayDate, v.weekdays, v.returnDay, v.returnDate]), EXPECTED);
@@ -234,7 +253,7 @@ describe('vacation calendar', () => {
   });
 
   test('staff add, edit and delete vacations', async () => {
-    const cookie = await login(DEMO_ACCOUNTS.staff.phone);
+    const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const bad = await call(cookie, 'POST', '/staff/vacations', {
       name: 'יום צוות', type: 'staff_day', startDate: '2027-02-05', endDate: '2027-02-05', returnDate: '2027-02-04',
     });

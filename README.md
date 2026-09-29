@@ -6,6 +6,7 @@ Staff document a child's day in a few taps; parents understand it in 10 seconds.
 > פחות התעסקות לצוות. יותר שקט להורים.
 
 Product analysis, information architecture, data model, permissions and flows: [`docs/PRODUCT.md`](docs/PRODUCT.md).
+Visual design (based on the Google Stitch reference) and what was taken from it: [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Run it
 
@@ -31,11 +32,11 @@ The database lives at `data/gan.db` (override with `DB_PATH`).
 
 Password for all: `gan12345` (the login screen also has one-tap demo buttons).
 
-| Entrance | Name | Phone |
+| Entrance | Name | Username |
 |---|---|---|
-| כניסת הורים | נוי (parent of ניב and אלה) | 050-0000001 |
-| כניסת צוות הגן | מיכל (teacher) | 050-0000002 |
-| כניסת צוות הגן | אורית (owner — same role as teachers) | 050-0000003 |
+| כניסת הורים | נוי (parent of ניב and אלה) | `noy` |
+| כניסת צוות הגן | מיכל (teacher) | `michal` |
+| כניסת צוות הגן | אורית (owner — same role as teachers) | `orit` |
 
 ## Structure
 
@@ -50,7 +51,8 @@ server/            Express API
   seed.js          Hebrew demo data
   test/            node:test API & permission tests
 client/src/        React (Vite), RTL Hebrew UI
-  teacher/         staff app: היום (batch + exceptions) · הילדים · הגן · לוח חופשות (editable)
+  teacher/         staff app: דשבורד · ילדי הגן · עדכון יומי לילד/ה · עדכון מהיר לקבוצה ·
+                   עדכון תפריט · פעילויות וחוגים · הודעות · לוח חופשות (editable)
   parent/          parent app: היום של ניב · עדכון לגן · הילדה שלי · לוח חופשות
   shared/          API client, Hebrew copy & gender-aware phrasing, UI primitives
 ```

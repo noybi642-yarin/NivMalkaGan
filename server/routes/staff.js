@@ -11,15 +11,15 @@ import {
   fieldToColumns,
   parseId,
   parseSupplyItems,
+  parseActivities,
   serializeClassDay,
+  serializeMenu,
   serializeParentUpdate,
   serializeReport,
   serializeSupply,
   todayIL,
   upsertReport,
 } from '../domain.js';
-
-const ACTIVITY_LIMIT = 12;
 
 export function staffRoutes(db) {
   const r = Router();
@@ -72,6 +72,7 @@ export function staffRoutes(db) {
       classes: kindergartenClasses(user, date),
       class: { id: cls.id, name: cls.name },
       day: serializeClassDay(db.prepare('SELECT * FROM class_days WHERE class_id = ? AND date = ?').get(cls.id, date)),
+      menu: serializeMenu(db.prepare('SELECT * FROM menus WHERE kindergarten_id = ? AND date = ?').get(user.kindergartenId, date)),
       children: children.map((c) => ({
         ...c,
         report: serializeReport(reports.get(c.id)),
@@ -149,22 +150,47 @@ export function staffRoutes(db) {
     res.json({ supplies: supplies.map(serializeSupply) });
   });
 
-  // Class-level info, entered once for everyone.
+  // Today's activities, defined once per class; each child's report then selects from them.
   r.put('/classes/:classId/day', (req, res) => {
     const cls = staffClass(db, req.user, parseId(req.params.classId));
-    const { menuBreakfast, menuLunch, activities } = req.body ?? {};
-    if (!Array.isArray(activities) || activities.length > ACTIVITY_LIMIT) throw bad();
-    const cleanActivities = [...new Set(activities.map(cleanText).filter(Boolean))];
-    if (cleanActivities.some((a) => a.length > 40)) throw bad('activity too long');
+    const activities = parseActivities(req.body?.activities);
     const date = todayIL();
     db.prepare(
-      `INSERT INTO class_days (class_id, date, menu_breakfast, menu_lunch, activities, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (class_id, date) DO UPDATE SET
-         menu_breakfast = excluded.menu_breakfast, menu_lunch = excluded.menu_lunch,
-         activities = excluded.activities, updated_at = excluded.updated_at`,
-    ).run(cls.id, date, cleanText(menuBreakfast), cleanText(menuLunch), JSON.stringify(cleanActivities), Date.now());
+      `INSERT INTO class_days (class_id, date, activities, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (class_id, date) DO UPDATE SET activities = excluded.activities, updated_at = excluded.updated_at`,
+    ).run(cls.id, date, JSON.stringify(activities), Date.now());
     res.json({ day: serializeClassDay(db.prepare('SELECT * FROM class_days WHERE class_id = ? AND date = ?').get(cls.id, date)) });
+  });
+
+  // Today's menu, entered once for the whole kindergarten.
+  r.put('/menu', (req, res) => {
+    const { breakfast, lunch, snack } = req.body ?? {};
+    const date = todayIL();
+    db.prepare(
+      `INSERT INTO menus (kindergarten_id, date, breakfast, lunch, snack, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (kindergarten_id, date) DO UPDATE SET
+         breakfast = excluded.breakfast, lunch = excluded.lunch, snack = excluded.snack, updated_at = excluded.updated_at`,
+    ).run(req.user.kindergartenId, date, cleanText(breakfast), cleanText(lunch), cleanText(snack), Date.now());
+    res.json({ menu: serializeMenu(db.prepare('SELECT * FROM menus WHERE kindergarten_id = ? AND date = ?').get(req.user.kindergartenId, date)) });
+  });
+
+  // Today's messages from parents, for the whole kindergarten.
+  r.get('/parent-updates', (req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT pu.*, c.name AS childName, c.gender, cl.name AS className FROM parent_updates pu
+         JOIN children c ON c.id = pu.child_id JOIN classes cl ON cl.id = c.class_id
+         WHERE cl.kindergarten_id = ? AND pu.date = ? ORDER BY pu.seen_at IS NOT NULL, pu.created_at DESC`,
+      )
+      .all(req.user.kindergartenId, todayIL());
+    res.json({
+      parentUpdates: rows.map((row) => ({
+        ...serializeParentUpdate(row),
+        childName: row.childName,
+        gender: row.gender,
+        className: row.className,
+      })),
+    });
   });
 
   r.post('/parent-updates/:id/seen', (req, res) => {

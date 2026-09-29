@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
 import { PARENT_UPDATES, formatTime, parentUpdateText } from '../shared/copy.js';
-import { Chip, PageHeader, toast } from '../shared/ui.jsx';
+import { Chip, SectionHead, TopBar, toast } from '../shared/ui.jsx';
 
 const NOTE_HINTS = {
   early_pickup: 'באיזו שעה?',
@@ -9,7 +9,7 @@ const NOTE_HINTS = {
   other: 'מה חשוב שנדע?',
 };
 
-export default function ParentUpdate({ child, logoutButton, switcher }) {
+export default function ParentUpdate({ child, kindergarten, logoutButton, switcher }) {
   const { data, setData } = useLoad(`/parent/children/${child.id}/day`);
   const [types, setTypes] = useState([]);
   const [note, setNote] = useState('');
@@ -39,10 +39,15 @@ export default function ParentUpdate({ child, logoutButton, switcher }) {
 
   return (
     <>
-      <PageHeader title="עדכון לגן" subtitle={`משהו שהצוות צריך לדעת על ${child.name} היום?`} action={logoutButton} />
+      <TopBar place={kindergarten?.name} title="הודעות לגן" action={logoutButton} />
+      <section className="hello">
+        <h1>עדכון לגן <span aria-hidden="true">💌</span></h1>
+        <p className="muted">משהו שהצוות צריך לדעת על {child.name} היום?</p>
+      </section>
       {switcher && <div className="page-pad">{switcher}</div>}
 
       <section className="card">
+        <SectionHead emoji="📝" tone="lilac" title="מה חשוב שנדע?" />
         <div className="chips chips-stack">
           {PARENT_UPDATES.map((p) => (
             <Chip key={p.value} on={types.includes(p.value)} onClick={() => toggle(p.value)}>

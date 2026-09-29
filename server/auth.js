@@ -24,12 +24,9 @@ export function verifyPassword(password, stored = DUMMY_HASH) {
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
-/** Israeli mobile numbers in any common format → 05XXXXXXXX. */
-export function normalizePhone(phone) {
-  if (typeof phone !== 'string') return '';
-  let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('972')) digits = `0${digits.slice(3)}`;
-  return digits;
+/** Usernames are case-insensitive and ignore surrounding spaces. */
+export function normalizeUsername(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase().slice(0, 64) : '';
 }
 
 export function createSession(db, userId) {

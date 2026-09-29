@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, useLoad } from '../shared/api.js';
 import { ErrorState, IconButton, Loading, Shell, toast } from '../shared/ui.jsx';
-import TodayScreen from './TodayScreen.jsx';
+import Dashboard from './Dashboard.jsx';
 import ChildrenScreen from './ChildrenScreen.jsx';
-import ClassDayScreen from './ClassDayScreen.jsx';
-import ChildSheet from './ChildSheet.jsx';
+import ChildUpdate from './ChildUpdate.jsx';
+import TodayScreen from './TodayScreen.jsx';
+import MenuScreen from './MenuScreen.jsx';
+import ActivitiesScreen from './ActivitiesScreen.jsx';
+import MessagesScreen from './MessagesScreen.jsx';
 import StaffVacations from './StaffVacations.jsx';
 
 const TABS = [
-  { key: 'today', label: 'היום', icon: 'today' },
-  { key: 'children', label: 'הילדים', icon: 'children' },
-  { key: 'gan', label: 'הגן', icon: 'gan' },
+  { key: 'home', label: 'היום', icon: 'today' },
+  { key: 'children', label: 'ילדי הגן', icon: 'face' },
   { key: 'vacations', label: 'לוח חופשות', icon: 'calendar' },
+  { key: 'messages', label: 'הודעות', icon: 'message' },
 ];
 
 const CLASS_KEY = 'gan:class';
@@ -30,14 +33,16 @@ function localReport(report, field, value) {
     const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
     next.sleep = { ...value, minutes: toMin(value.end) - toMin(value.start) };
   }
-  next.complete = !next.absent && Boolean(next.food && next.sleep && next.poop && next.mood);
+  next.complete = !next.absent && Boolean(next.food && next.mood);
   return next;
 }
 
 export default function TeacherApp({ user, onLogout }) {
-  const [tab, setTab] = useState('today');
+  const [tab, setTab] = useState('home');
+  const [screen, setScreen] = useState(null); // an inner screen opened on top of the tabs
   const [classId, setClassId] = useState(storedClass);
   const { data, setData, error, reload } = useLoad(`/staff/today${classId ? `?classId=${classId}` : ''}`);
+  const info = useLoad('/kindergarten');
 
   useEffect(() => {
     try {
@@ -52,7 +57,8 @@ export default function TeacherApp({ user, onLogout }) {
   useEffect(() => {
     if (error?.status === 404 && classId) setClassId(null);
   }, [error, classId]);
-  const [openChildId, setOpenChildId] = useState(null);
+
+  useEffect(() => window.scrollTo(0, 0), [tab, screen]);
 
   const updateChildren = useCallback(
     (fn) => setData((d) => (d ? { ...d, children: d.children.map(fn) } : d)),
@@ -64,7 +70,7 @@ export default function TeacherApp({ user, onLogout }) {
     reload();
   }, [reload]);
 
-  /** Batch: one field, many children. Returns a function that undoes it. */
+  /** Batch: one field, many children, with undo. */
   const applyField = useCallback(
     async (field, entries, { undoable = true } = {}) => {
       const byId = new Map(entries.map((e) => [e.childId, e.value]));
@@ -89,6 +95,7 @@ export default function TeacherApp({ user, onLogout }) {
     [data, setData, updateChildren, onFail],
   );
 
+  /** Instant single-field save, used by the quick batch screen. */
   const patchChild = useCallback(
     async (childId, fields) => {
       updateChildren((c) =>
@@ -106,16 +113,25 @@ export default function TeacherApp({ user, onLogout }) {
     [updateChildren, onFail],
   );
 
-  const setSupplies = useCallback(
-    async (childId, items, otherText) => {
+  /** "שמירת העדכון" on the child screen: all changed fields (and supplies) in one go. */
+  const saveChild = useCallback(
+    async (childId, fields, supplies) => {
       try {
-        const { supplies } = await api(`/staff/children/${childId}/supplies`, { method: 'PUT', body: { items, otherText } });
-        updateChildren((c) => (c.id === childId ? { ...c, supplies } : c));
+        const next = {};
+        if (Object.keys(fields).length) {
+          next.report = (await api(`/staff/children/${childId}/report`, { method: 'PATCH', body: fields })).report;
+        }
+        if (supplies) {
+          next.supplies = (await api(`/staff/children/${childId}/supplies`, { method: 'PUT', body: supplies })).supplies;
+        }
+        updateChildren((c) => (c.id === childId ? { ...c, ...next } : c));
+        return true;
       } catch {
-        onFail();
+        toast('השמירה לא הצליחה. נסו שוב');
+        return false;
       }
     },
-    [updateChildren, onFail],
+    [updateChildren],
   );
 
   const markSeen = useCallback(
@@ -129,11 +145,11 @@ export default function TeacherApp({ user, onLogout }) {
     [updateChildren, onFail],
   );
 
-  const saveDay = useCallback(
-    async (day) => {
-      setData((d) => ({ ...d, day }));
+  const saveActivities = useCallback(
+    async (activities) => {
+      setData((d) => ({ ...d, day: { ...d.day, activities } }));
       try {
-        const res = await api(`/staff/classes/${data.class.id}/day`, { method: 'PUT', body: day });
+        const res = await api(`/staff/classes/${data.class.id}/day`, { method: 'PUT', body: { activities } });
         setData((d) => ({ ...d, day: res.day }));
       } catch {
         onFail();
@@ -142,65 +158,108 @@ export default function TeacherApp({ user, onLogout }) {
     [data, setData, onFail],
   );
 
-  const logoutButton = <IconButton icon="logout" label="יציאה" onClick={onLogout} />;
+  const saveMenu = useCallback(
+    async (menu) => {
+      try {
+        const res = await api('/staff/menu', { method: 'PUT', body: menu });
+        setData((d) => ({ ...d, menu: res.menu }));
+        return true;
+      } catch {
+        toast('השמירה לא הצליחה. נסו שוב');
+        return false;
+      }
+    },
+    [setData],
+  );
 
-  if (tab === 'vacations') {
-    return <Shell tabs={TABS} tab={tab} onTab={setTab}><StaffVacations logoutButton={logoutButton} /></Shell>;
+  const logoutButton = <IconButton icon="logout" label="יציאה" onClick={onLogout} />;
+  const kindergarten = info.data?.kindergarten;
+  const goTab = (key) => {
+    setScreen(null);
+    setTab(key);
+  };
+  const fab = { icon: 'bolt', label: 'עדכון מהיר לקבוצה', onClick: () => setScreen({ name: 'batch' }) };
+  const frame = (content) => <Shell tabs={TABS} tab={tab} onTab={goTab} fab={data?.class ? fab : null}>{content}</Shell>;
+
+  if (tab === 'vacations' && !screen) return frame(<StaffVacations place={kindergarten?.name} logoutButton={logoutButton} />);
+  if (tab === 'messages' && !screen) {
+    return frame(<MessagesScreen place={kindergarten?.name} info={info} logoutButton={logoutButton} onSeen={markSeen} />);
   }
-  if (error) return <Shell tabs={TABS} tab={tab} onTab={setTab}><ErrorState onRetry={reload} /></Shell>;
-  if (!data) return <Shell tabs={TABS} tab={tab} onTab={setTab}><Loading /></Shell>;
-  if (!data.class) {
+  if (error) return frame(<ErrorState onRetry={reload} />);
+  if (!data) return frame(<Loading />);
+  if (!data.class) return frame(<div className="empty"><p>עוד אין כיתות בגן.</p>{logoutButton}</div>);
+
+  const children = data.children;
+  const pending = children.filter((c) => !c.report.absent && !c.report.complete);
+  const classSwitcher = <ClassSwitcher classes={data.classes} value={data.class.id} onChange={setClassId} />;
+  const back = () => setScreen(null);
+  const common = { data, user, place: kindergarten?.name, logoutButton, classSwitcher };
+
+  // Inner screens take the whole page (no tab bar), with a back button.
+  if (screen?.name === 'child') {
+    const child = children.find((c) => c.id === screen.id);
+    if (child) {
+      const nextPending = pending.find((c) => c.id !== child.id);
+      return (
+        <div className="app">
+          <ChildUpdate
+            key={child.id}
+            child={child}
+            date={data.date}
+            day={data.day}
+            place={data.class.name}
+            nextChild={nextPending}
+            onBack={back}
+            onSave={saveChild}
+            onSeen={markSeen}
+            onOpen={(id) => setScreen({ name: 'child', id })}
+            onDefineActivities={() => setScreen({ name: 'activities' })}
+          />
+        </div>
+      );
+    }
+  }
+  if (screen?.name === 'batch') {
     return (
-      <Shell tabs={TABS} tab={tab} onTab={setTab}>
-        <div className="empty"><p>עוד אין כיתות בגן.</p>{logoutButton}</div>
-      </Shell>
+      <div className="app">
+        <main className="main main-plain">
+          <TodayScreen key={data.class.id} {...common} onBack={back} applyField={applyField} patchChild={patchChild}
+            onOpenChild={(id) => setScreen({ name: 'child', id })} />
+        </main>
+      </div>
+    );
+  }
+  if (screen?.name === 'menu') {
+    return <div className="app"><MenuScreen {...common} menu={data.menu} onSave={saveMenu} onBack={back} /></div>;
+  }
+  if (screen?.name === 'activities') {
+    return (
+      <div className="app">
+        <ActivitiesScreen key={data.class.id} {...common} onSave={saveActivities} onBack={back} />
+      </div>
     );
   }
 
-  const present = data.children.filter((c) => !c.report.absent);
-  const pending = present.filter((c) => !c.report.complete).length;
-  const children = data.children;
-  const openIndex = children.findIndex((c) => c.id === openChildId);
-  const openChild = openIndex > -1 ? children[openIndex] : null;
-
-  // The open class's percentage follows local edits; the others come from the last load.
-  const livePct = present.length ? Math.round(((present.length - pending) / present.length) * 100) : 100;
-  const classes = data.classes.map((c) => (c.id === data.class.id ? { ...c, pct: livePct } : c));
-  const classSwitcher = <ClassSwitcher classes={classes} value={data.class.id} onChange={setClassId} />;
-  const common = { data, user, onOpenChild: setOpenChildId, logoutButton, classSwitcher };
-
-  return (
-    <Shell tabs={TABS.map((t) => (t.key === 'children' && pending ? { ...t, badge: pending } : t))} tab={tab} onTab={setTab}>
-      {tab === 'today' && <TodayScreen key={data.class.id} {...common} applyField={applyField} patchChild={patchChild} markSeen={markSeen} />}
-      {tab === 'children' && <ChildrenScreen {...common} />}
-      {tab === 'gan' && <ClassDayScreen key={data.class.id} {...common} saveDay={saveDay} />}
-
-      {openChild && (
-        <ChildSheet
-          key={openChild.id}
-          child={openChild}
-          date={data.date}
-          position={`${openIndex + 1}/${children.length}`}
-          onClose={() => setOpenChildId(null)}
-          onNext={() => setOpenChildId(children[(openIndex + 1) % children.length].id)}
-          patchChild={patchChild}
-          setSupplies={setSupplies}
-          markSeen={markSeen}
-        />
+  return frame(
+    <>
+      {tab === 'home' && (
+        <Dashboard {...common} kindergarten={kindergarten} pending={pending} onSeen={markSeen}
+          open={(name) => (['children', 'messages', 'vacations'].includes(name) ? goTab(name) : setScreen({ name }))} />
       )}
-    </Shell>
+      {tab === 'children' && <ChildrenScreen {...common} onOpenChild={(id) => setScreen({ name: 'child', id })} />}
+    </>,
   );
 }
 
-/** All classes of the kindergarten, with how much of today is already updated. */
+/** All classes of the kindergarten; any staff member can work on any class. */
 function ClassSwitcher({ classes, value, onChange }) {
   if (classes.length < 2) return null;
   return (
-    <div className="class-switch" role="tablist" aria-label="כיתה">
+    <div className="class-switch" role="tablist" aria-label="קבוצה">
       {classes.map((c) => (
         <button key={c.id} role="tab" aria-selected={c.id === value} className={c.id === value ? 'is-on' : ''}
           onClick={() => onChange(c.id)}>
-          {c.name} <small>{c.pct}%</small>
+          {c.name}
         </button>
       ))}
     </div>

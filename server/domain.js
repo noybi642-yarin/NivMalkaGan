@@ -2,7 +2,7 @@
 
 export const TZ = 'Asia/Jerusalem';
 
-export const FOOD = ['all', 'most', 'little', 'none'];
+export const FOOD = ['well', 'partial', 'little'];
 export const POOP = ['yes', 'no'];
 export const MOOD = ['great', 'good', 'hard'];
 export const SUPPLY_ITEMS = ['diapers', 'wipes', 'clothes', 'bottle', 'other'];
@@ -88,6 +88,8 @@ export function fieldToColumns(field, value) {
     case 'highlight':
     case 'note':
       return { [field]: cleanText(value) };
+    case 'activities':
+      return { activities: value === null ? null : JSON.stringify(parseActivities(value)) };
     case 'sleep': {
       if (value === null) return { sleep_status: null, sleep_start: null, sleep_end: null };
       if (typeof value !== 'object') throw bad('invalid sleep');
@@ -103,7 +105,17 @@ export function fieldToColumns(field, value) {
   }
 }
 
-export const REPORT_FIELDS = ['absent', 'food', 'sleep', 'poop', 'mood', 'highlight', 'note'];
+export const REPORT_FIELDS = ['absent', 'food', 'sleep', 'poop', 'mood', 'highlight', 'note', 'activities'];
+
+const ACTIVITY_LIMIT = 12;
+
+/** A list of short activity names, deduplicated. */
+export function parseActivities(value) {
+  if (!Array.isArray(value) || value.length > ACTIVITY_LIMIT) throw bad('invalid activities');
+  const list = [...new Set(value.map(cleanText).filter(Boolean))];
+  if (list.some((a) => a.length > 40)) throw bad('activity too long');
+  return list;
+}
 
 export function upsertReport(db, childId, date, columns, userId) {
   const names = Object.keys(columns);
@@ -138,14 +150,16 @@ export function serializeReport(row) {
     mood: r.mood ?? null,
     highlight: r.highlight ?? null,
     note: r.note ?? null,
+    activities: r.activities ? JSON.parse(r.activities) : null,
     updatedAt: r.updated_at ?? null,
   };
   report.complete = isComplete(report);
   return report;
 }
 
+/** "עודכן" = the parent already knows how the day went and how the child ate. */
 export function isComplete(report) {
-  return !report.absent && Boolean(report.food && report.sleep && report.poop && report.mood);
+  return !report.absent && Boolean(report.food && report.mood);
 }
 
 export function serializeSupply(row) {
@@ -173,9 +187,9 @@ export function serializeParentUpdate(row) {
 }
 
 export function serializeClassDay(row) {
-  return {
-    menuBreakfast: row?.menu_breakfast ?? null,
-    menuLunch: row?.menu_lunch ?? null,
-    activities: row ? JSON.parse(row.activities) : [],
-  };
+  return { activities: row ? JSON.parse(row.activities) : [] };
+}
+
+export function serializeMenu(row) {
+  return { breakfast: row?.breakfast ?? null, lunch: row?.lunch ?? null, snack: row?.snack ?? null };
 }

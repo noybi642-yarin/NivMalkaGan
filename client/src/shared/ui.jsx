@@ -15,6 +15,10 @@ const ICONS = {
   close: 'M6 6l12 12M18 6 6 18',
   check: 'M5 12.5 10 17 19 7',
   chevron: 'M15 6l-6 6 6 6',
+  back: 'M9 6l6 6-6 6',
+  face: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9 10h.01M15 10h.01M8.5 14.5c1.8 1.8 5.2 1.8 7 0',
+  note: 'M5 4h14v11l-5 5H5V4ZM14 20v-5h5M8.5 9h7M8.5 12.5h4',
+  bolt: 'M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z',
 };
 
 export function Icon({ name, size = 22 }) {
@@ -26,22 +30,76 @@ export function Icon({ name, size = 22 }) {
   );
 }
 
-export function Shell({ tabs, tab, onTab, children }) {
+/** App frame: content + bottom nav. `fab` is the raised middle action (staff quick update). */
+export function Shell({ tabs, tab, onTab, fab, children }) {
+  const half = Math.ceil(tabs.length / 2);
+  const item = (t) => (
+    <button key={t.key} className={`nav-item${t.key === tab ? ' is-active' : ''}`}
+      aria-current={t.key === tab ? 'page' : undefined} onClick={() => onTab(t.key)}>
+      <Icon name={t.icon} />
+      <span>{t.label}</span>
+      {t.badge ? <i className="nav-badge">{t.badge}</i> : null}
+    </button>
+  );
   return (
     <div className="app">
       <main className="main">{children}</main>
-      <nav className="nav" aria-label="ניווט ראשי">
-        {tabs.map((t) => (
-          <button key={t.key} className={`nav-item${t.key === tab ? ' is-active' : ''}`}
-            aria-current={t.key === tab ? 'page' : undefined} onClick={() => onTab(t.key)}>
-            <Icon name={t.icon} />
-            <span>{t.label}</span>
-            {t.badge ? <i className="nav-badge">{t.badge}</i> : null}
-          </button>
-        ))}
+      <nav className={`nav${fab ? ' has-fab' : ''}`} aria-label="ניווט ראשי">
+        {fab ? (
+          <>
+            {tabs.slice(0, half).map(item)}
+            <button className="nav-fab" onClick={fab.onClick} aria-label={fab.label} title={fab.label}>
+              <Icon name={fab.icon} size={26} />
+            </button>
+            {tabs.slice(half).map(item)}
+          </>
+        ) : tabs.map(item)}
       </nav>
     </div>
   );
+}
+
+/** Top bar: leaf badge + kindergarten name + screen title; a back button on inner screens. */
+export function TopBar({ place, title, onBack, action }) {
+  return (
+    <header className="topbar">
+      <div className="topbar-start">
+        {onBack ? (
+          <button className="icon-btn icon-btn-flat" onClick={onBack} aria-label="חזרה"><Icon name="back" size={22} /></button>
+        ) : (
+          <span className="brand-badge" aria-hidden="true">🌿</span>
+        )}
+        <div>
+          {place && <span className="topbar-place">{place}</span>}
+          <h1 className="topbar-title">{title}</h1>
+        </div>
+      </div>
+      {action}
+    </header>
+  );
+}
+
+/** Card heading: round tinted badge + title, optional pill at the far side. */
+export function SectionHead({ emoji, tone = 'peach', title, aside }) {
+  return (
+    <div className="section-head">
+      <span className={`badge-icon tone-${tone}`} aria-hidden="true">{emoji}</span>
+      <h2>{title}</h2>
+      {aside}
+    </div>
+  );
+}
+
+export function StatusPill({ status, children }) {
+  const icon = { done: '✓', pending: '⏳', absent: '🏠' }[status];
+  return <span className={`pill pill-${status}`}><span aria-hidden="true">{icon}</span> {children}</span>;
+}
+
+/** No photos are stored, so children get a warm initial-letter avatar. */
+export function Avatar({ name, size = 'md', tone }) {
+  const tones = ['peach', 'mint', 'lilac', 'sky', 'butter'];
+  const pick = tone ?? tones[[...name].reduce((n, ch) => n + ch.charCodeAt(0), 0) % tones.length];
+  return <span className={`avatar avatar-${size} tone-${pick}`} aria-hidden="true">{name[0]}</span>;
 }
 
 export function PageHeader({ eyebrow, title, subtitle, action }) {

@@ -1,82 +1,105 @@
 import {
+  FOOD,
+  MENU_MEALS,
   MOOD,
   activityIcon,
-  foodSentence,
+  childActivities,
+  foodLabel,
   g,
-  joinHe,
   moodSentence,
   poopSentence,
   sleepSentence,
   timeRange,
 } from '../shared/copy.js';
+import { SectionHead } from '../shared/ui.jsx';
 
-/** The child's day in the order a parent reads it: feeling + moment, then the facts. */
-export default function DaySummary({ child, report, day, showHero = true }) {
+/**
+ * The child's day, section by section: איך עבר היום · מה אכלתי · פעילויות · משהו חדש שעשיתי ·
+ * כדאי שתדעו · מנוחה. A section with nothing to say is not shown.
+ */
+export default function DaySummary({ child, report, day, menu }) {
   const mood = MOOD.find((m) => m.value === report.mood);
-  const items = [];
-  if (report.food) {
-    items.push({
-      icon: '🍽️',
-      text: foodSentence(report.food, child.gender),
-      sub: [day.menuBreakfast && `בוקר: ${day.menuBreakfast}`, day.menuLunch && `צהריים: ${day.menuLunch}`].filter(Boolean),
-    });
-  } else if (day.menuBreakfast || day.menuLunch) {
-    items.push({
-      icon: '🍽️',
-      text: 'תפריט היום',
-      sub: [day.menuBreakfast && `בוקר: ${day.menuBreakfast}`, day.menuLunch && `צהריים: ${day.menuLunch}`].filter(Boolean),
-    });
-  }
-  if (report.sleep) {
-    items.push({
-      icon: '😴',
-      text: sleepSentence(report.sleep, child.gender),
-      sub: report.sleep.status === 'slept' ? [timeRange(report.sleep)] : [],
-    });
-  }
-  if (report.poop) items.push({ icon: '💩', text: poopSentence(report.poop), sub: [] });
-  if (day.activities.length) {
-    items.push({ icon: activityIcon(day.activities[0]), text: `היום בגן: ${joinHe(day.activities)}`, sub: [] });
-  }
+  const meals = MENU_MEALS.filter((m) => menu?.[m.key]);
+  const activities = childActivities(report, day);
 
   return (
     <>
-      {showHero && (mood || report.highlight) && (
-        <section className={`hero hero-${report.mood || 'none'}`}>
-          {mood && (
-            <p className="hero-mood">
-              <span className="hero-emoji" aria-hidden="true">{mood.emoji}</span>
-              {moodSentence(report.mood, child.name)}
-            </p>
+      {mood && (
+        <section className="card mood-summary">
+          <span className="mood-summary-emoji" aria-hidden="true">{mood.emoji}</span>
+          <div>
+            <span className="eyebrow-label">איך עבר היום?</span>
+            <h2>{moodSentence(report.mood, child.name)}</h2>
+          </div>
+        </section>
+      )}
+
+      {(report.food || meals.length > 0) && (
+        <section className="card">
+          <SectionHead emoji="🍎" tone="peach" title="מה אכלתי"
+            aside={report.food && (
+              <span className="pill pill-done">
+                {foodLabel(report.food, child.gender)} {FOOD.find((f) => f.value === report.food).emoji}
+              </span>
+            )} />
+          {meals.length > 0 && (
+            <ul className="meal-list">
+              {meals.map((m) => (
+                <li key={m.key}>
+                  <span className="meal-name">{m.emoji} {m.label}</span>
+                  <span className="muted">{menu[m.key]}</span>
+                </li>
+              ))}
+            </ul>
           )}
-          {report.highlight && (
-            <blockquote className="moment">
-              <span className="moment-label">רגע קטן מהיום</span>
-              <p>{report.highlight}</p>
-            </blockquote>
-          )}
+        </section>
+      )}
+
+      {activities.length > 0 && (
+        <section className="card">
+          <SectionHead emoji="🎨" tone="sky" title="פעילויות"
+            aside={<span className="muted small">{activities.length === 1 ? 'פעילות אחת' : `${activities.length} פעילויות`}</span>} />
+          <ul className="activity-strip">
+            {activities.map((a, i) => (
+              <li key={a} className={`activity-tile tone-${['mint', 'peach', 'rose', 'sky'][i % 4]}`}>
+                <span className="activity-tile-icon" aria-hidden="true">{activityIcon(a)}</span>
+                <strong>{a}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {report.highlight && (
+        <section className="card milestone">
+          <span className="badge-icon tone-white" aria-hidden="true">🌟</span>
+          <div>
+            <span className="eyebrow-label">משהו חדש שעשיתי</span>
+            <p className="milestone-text">{report.highlight}</p>
+          </div>
         </section>
       )}
 
       {report.note && (
-        <section className="card card-note">
-          <h2 className="card-title">כדאי לדעת</h2>
-          <p>{report.note}</p>
+        <section className="card">
+          <SectionHead emoji="💛" tone="butter" title="כדאי שתדעו" />
+          <p className="body-text">{report.note}</p>
         </section>
       )}
 
-      {items.length > 0 && (
-        <ul className="card timeline" aria-label={`היום של ${child.name}`}>
-          {items.map((it) => (
-            <li key={it.text}>
-              <span className="tl-icon" aria-hidden="true">{it.icon}</span>
-              <div>
-                <p>{it.text}</p>
-                {it.sub.map((s) => <p key={s} className="muted small">{s}</p>)}
-              </div>
-            </li>
-          ))}
-        </ul>
+      {(report.sleep || report.poop) && (
+        <section className="card">
+          <SectionHead emoji="😴" tone="mint" title="מנוחה" />
+          <ul className="rest-list">
+            {report.sleep && (
+              <li>
+                {sleepSentence(report.sleep, child.gender)}
+                {report.sleep.status === 'slept' && <span className="muted small"> · {timeRange(report.sleep)}</span>}
+              </li>
+            )}
+            {report.poop && <li>{poopSentence(report.poop)}</li>}
+          </ul>
+        </section>
       )}
     </>
   );

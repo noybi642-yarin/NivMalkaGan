@@ -4,11 +4,19 @@
 export const g = (gender, male, female) => (gender === 'f' ? female : male);
 
 export const FOOD = [
-  { value: 'all', short: 'הכל', batch: 'אכלו הכל', label: 'אכל/ה הכל' },
-  { value: 'most', short: 'רוב', batch: 'אכלו רוב', label: 'אכל/ה רוב' },
-  { value: 'little', short: 'מעט', batch: 'אכלו מעט', label: 'אכל/ה מעט' },
-  { value: 'none', short: 'לא', batch: 'לא אכלו', label: 'לא אכל/ה' },
+  { value: 'well', short: 'יפה', batch: 'אכלו יפה', emoji: '😋' },
+  { value: 'partial', short: 'חלקית', batch: 'אכלו חלקית', emoji: '🙂' },
+  { value: 'little', short: 'כמעט לא', batch: 'כמעט לא אכלו', emoji: '🌱' },
 ];
+
+/** 'well' → 'אכלה יפה' */
+export function foodLabel(food, gender) {
+  return {
+    well: g(gender, 'אכל יפה', 'אכלה יפה'),
+    partial: g(gender, 'אכל חלקית', 'אכלה חלקית'),
+    little: g(gender, 'כמעט לא אכל', 'כמעט לא אכלה'),
+  }[food];
+}
 
 export const POOP = [
   { value: 'yes', short: 'כן', batch: 'כן' },
@@ -22,10 +30,30 @@ export const MOOD = [
 ];
 
 export const FIELDS = [
-  { key: 'food', label: 'אוכל', icon: '🍽️', options: FOOD },
+  { key: 'food', label: 'ארוחות', icon: '🍽️', options: FOOD },
+  { key: 'mood', label: 'איך עבר', title: 'איך עבר היום?', icon: '😊', options: MOOD },
   { key: 'sleep', label: 'שינה', icon: '😴' },
   { key: 'poop', label: 'יציאה', icon: '💩', options: POOP },
-  { key: 'mood', label: 'איך עבר', title: 'איך עבר היום?', icon: '😊', options: MOOD },
+];
+
+/** 'done' | 'pending' | 'absent' — the only status staff need. */
+export function childStatus(report) {
+  if (report.absent) return 'absent';
+  return report.complete ? 'done' : 'pending';
+}
+
+export function statusLabel(status, gender) {
+  if (status === 'absent') return g(gender, 'נעדר היום', 'נעדרה היום');
+  return status === 'done' ? 'עודכן היום' : 'ממתין לעדכון';
+}
+
+/** Which of today's activities the child joined (null in the report = all of them). */
+export const childActivities = (report, day) => report.activities ?? day.activities;
+
+export const MENU_MEALS = [
+  { key: 'breakfast', label: 'ארוחת בוקר', emoji: '🥣' },
+  { key: 'lunch', label: 'ארוחת צהריים', emoji: '🍲' },
+  { key: 'snack', label: 'ארוחת ביניים', emoji: '🍎' },
 ];
 
 export const SUPPLIES = [
@@ -87,19 +115,10 @@ export function sleepShort(sleep, gender) {
 
 export function moodSentence(mood, name) {
   return {
-    great: `היה ל${name} יום מעולה היום`,
-    good: `היה ל${name} יום טוב היום`,
-    hard: `היה ל${name} יום קצת מאתגר היום`,
+    great: `היה ל${name} יום מעולה`,
+    good: `היה ל${name} יום טוב`,
+    hard: `היה ל${name} יום קצת מאתגר`,
   }[mood];
-}
-
-export function foodSentence(food, gender) {
-  return {
-    all: g(gender, 'אכל את כל ארוחת הצהריים', 'אכלה את כל ארוחת הצהריים'),
-    most: g(gender, 'אכל את רוב ארוחת הצהריים', 'אכלה את רוב ארוחת הצהריים'),
-    little: g(gender, 'אכל מעט מארוחת הצהריים', 'אכלה מעט מארוחת הצהריים'),
-    none: g(gender, 'לא אכל בצהריים', 'לא אכלה בצהריים'),
-  }[food];
 }
 
 export function sleepSentence(sleep, gender) {

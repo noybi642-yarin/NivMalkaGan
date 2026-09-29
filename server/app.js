@@ -6,7 +6,7 @@ import {
   loadUser,
   loginLimiter,
   requireRole,
-  normalizePhone,
+  normalizeUsername,
   readCookie,
   requireCsrfHeader,
   sessionCookie,
@@ -54,15 +54,15 @@ export function createApp(db, { secureCookies = false, demo = false } = {}) {
 
   const limiter = loginLimiter();
   api.post('/auth/login', (req, res) => {
-    const phone = normalizePhone(req.body?.phone);
+    const username = normalizeUsername(req.body?.username);
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     // The login screen has separate staff / parent entrances; an account only opens its own.
     const role = req.body?.role;
     if (role !== undefined && !['staff', 'parent'].includes(role)) throw new HttpError(400, 'invalid role');
-    const key = `${req.ip}|${phone}`;
+    const key = `${req.ip}|${username}`;
     if (limiter.blocked(key)) throw new HttpError(429, 'too many attempts');
-    const user = phone ? db.prepare('SELECT * FROM users WHERE phone = ?').get(phone) : null;
-    // Always run the hash so timing does not reveal whether the phone exists.
+    const user = username ? db.prepare('SELECT * FROM users WHERE username = ?').get(username) : null;
+    // Always run the hash so timing does not reveal whether the username exists.
     const ok = verifyPassword(password, user?.password_hash) && Boolean(user) && (!role || user.role === role);
     if (!ok) {
       limiter.fail(key);

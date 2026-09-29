@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
   kindergarten_id INTEGER NOT NULL REFERENCES kindergartens(id),
   role            TEXT NOT NULL CHECK (role IN ('parent', 'staff')),
   name            TEXT NOT NULL,
-  phone           TEXT NOT NULL UNIQUE,
+  username        TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash   TEXT NOT NULL
 );
 
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   child_id     INTEGER NOT NULL REFERENCES children(id),
   date         TEXT NOT NULL,
   absent       INTEGER NOT NULL DEFAULT 0,
-  food         TEXT CHECK (food IN ('all', 'most', 'little', 'none')),
+  food         TEXT CHECK (food IN ('well', 'partial', 'little')),
   sleep_status TEXT CHECK (sleep_status IN ('slept', 'none')),
   sleep_start  TEXT,
   sleep_end    TEXT,
@@ -63,19 +63,31 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   mood         TEXT CHECK (mood IN ('great', 'good', 'hard')),
   highlight    TEXT,
   note         TEXT,
+  -- Which of the class's activities the child joined; NULL = all of them (the default).
+  activities   TEXT,
   updated_at   INTEGER,
   updated_by   INTEGER REFERENCES users(id),
   PRIMARY KEY (child_id, date)
 );
 
+-- Today's activities, defined once per class.
 CREATE TABLE IF NOT EXISTS class_days (
-  class_id       INTEGER NOT NULL REFERENCES classes(id),
-  date           TEXT NOT NULL,
-  menu_breakfast TEXT,
-  menu_lunch     TEXT,
-  activities     TEXT NOT NULL DEFAULT '[]',
-  updated_at     INTEGER,
+  class_id   INTEGER NOT NULL REFERENCES classes(id),
+  date       TEXT NOT NULL,
+  activities TEXT NOT NULL DEFAULT '[]',
+  updated_at INTEGER,
   PRIMARY KEY (class_id, date)
+);
+
+-- Today's menu, entered once for the whole kindergarten.
+CREATE TABLE IF NOT EXISTS menus (
+  kindergarten_id INTEGER NOT NULL REFERENCES kindergartens(id),
+  date            TEXT NOT NULL,
+  breakfast       TEXT,
+  lunch           TEXT,
+  snack           TEXT,
+  updated_at      INTEGER,
+  PRIMARY KEY (kindergarten_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS supply_requests (
@@ -122,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_supplies_child ON supply_requests(child_id, statu
 CREATE INDEX IF NOT EXISTS idx_updates_child_date ON parent_updates(child_id, date);
 `;
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function openDb(file = process.env.DB_PATH || path.resolve('data/gan.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });

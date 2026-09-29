@@ -42,7 +42,7 @@ export default function SleepEditor({ value, gender, onChange, defaults = { star
       </div>
       <div className="sleep-actions">
         {!value && valid && (
-          <button className="btn btn-soft" onClick={() => commit(start, end)}>שמירת שעות</button>
+          <button className="btn btn-soft" onClick={() => commit(start, end)}>סימון שעות השינה</button>
         )}
         <Chip on={none} onClick={() => onChange(none ? null : { status: 'none' })}>
           {g(gender, 'לא ישן', 'לא ישנה')}

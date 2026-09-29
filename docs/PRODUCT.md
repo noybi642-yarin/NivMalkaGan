@@ -28,19 +28,19 @@ entrances ("כניסת הורים" / "כניסת צוות הגן") and an accoun
 Teachers and the kindergarten owner share the staff role — same login, screens and permissions.
 
 ```
-Staff (צוות הגן)                          Parents (הורים)
-├─ היום   field-by-field batch +          ├─ היום        the child's day + message from the gan
-│         exceptions, any class           ├─ הודעות לגן  structured morning update
-├─ הילדים per-child status, highlight,    ├─ הילד/ה שלי  kindergarten info + recent days
-│         supplies                        └─ לוח חופשות  vacation calendar (read-only)
-├─ הגן    menu + activities per class,
-│         general info for parents
-└─ לוח חופשות  add / edit / delete vacations
+Staff (צוות הגן)                               Parents (הורים)
+├─ היום (דשבורד)  what's waiting, parent        ├─ היום        היום של [שם]: איך עבר היום · מה אכלתי ·
+│                 messages, action tiles        │              פעילויות · משהו חדש שעשיתי · כדאי שתדעו ·
+├─ ילדי הגן       statuses → עדכון יומי לילד/ה  │              הודעות מהגן · לוח חופשות
+├─ ⚡ (middle)    עדכון מהיר לקבוצה (batch)     ├─ הודעות לגן  structured morning update
+├─ לוח חופשות     add / edit / delete           ├─ הילד/ה שלי  kindergarten info + recent days
+└─ הודעות         הודעה להורים + parents' notes └─ לוח חופשות  vacation calendar (read-only)
+   from the dashboard: עדכון תפריט · פעילויות וחוגים
 ```
 
-A class switcher ("תינוקייה 86% · צעירים 27% · בוגרים 79%") sits at the top of the staff screens:
-it lets any staff member work on any class and doubles as the owner's completion overview.
-A parent linked to several children gets a child switcher.
+Staff statuses are only "עודכן" / "ממתין לעדכון" / "נעדר/ה" — no percentages or KPIs.
+A class switcher lets any staff member work on any class; a parent with several children gets a child switcher.
+Login is username + password, through "כניסת הורים" or "כניסת צוות הגן".
 
 ## 3. Data model
 
@@ -58,14 +58,15 @@ sessions (hashed tokens → users)
 | Table | Notes |
 |---|---|
 | `kindergartens` | Root of all data. Holds the general info parents see (hours, phone, notice), the school year and the summer start. Everything else is reachable only through a `kindergarten_id`, so more kindergartens can be added later without changing the model. |
-| `daily_reports` | `absent`, `food` (all/most/little/none), `sleep_status` (slept/none) + `sleep_start`/`sleep_end`, `poop` (yes/no), `mood` (great/good/hard), `highlight` (רגע קטן מהיום — observations and milestones), `note` (כדאי לדעת). One row per child per day, upserted field-by-field. |
-| `class_days` | Menu (בוקר / צהריים) and activities — entered **once** per class, shown to every parent in that class. |
+| `daily_reports` | `absent`, `food` (well/partial/little — אכל/ה יפה / חלקית / כמעט לא), `activities` (which of the class's activities the child joined; NULL = all), `sleep_status` (slept/none) + `sleep_start`/`sleep_end`, `poop` (yes/no), `mood` (great/good/hard), `highlight` (רגע קטן מהיום — observations and milestones), `note` (כדאי לדעת). One row per child per day, upserted field-by-field. |
+| `menus` | Breakfast / lunch / snack — entered **once per day for the whole kindergarten**. Children only get an eating status. |
+| `class_days` | Today's activities — defined **once** per class; each child's update ticks which ones they joined. |
 | `vacations` | Name, type (holiday / staff_day / short_day), start/end/return dates, note. Display wording and weekdays are derived from the dates; optional overrides keep official wording such as "11.09 + 13.09". |
 | `supply_requests` | One row per child per day with a list of items. Parent marks "טופל ✓"; staff sees it. Open requests stay visible until handled. |
 | `parent_updates` | Structured morning updates (fixed options + optional short note). Staff marks "ראיתי" and the parent sees "הגן ראה ✓". Not a chat. |
 | `children.gender` | Used only to render correct Hebrew grammar ("אכלה" / "אכל"). |
 
-A report is **complete** when food, sleep, bowel movement and mood are set.
+A report is **complete** ("עודכן") when mood and eating are set; sleep and bowel movement are optional.
 Children marked absent are excluded from completion percentages.
 
 ## 4. Permissions

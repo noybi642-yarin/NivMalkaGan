@@ -10,6 +10,7 @@ import {
   parseId,
   parseUpdateTypes,
   serializeClassDay,
+  serializeMenu,
   serializeParentUpdate,
   serializeReport,
   serializeSupply,
@@ -46,7 +47,20 @@ export function parentRoutes(db) {
       day: serializeClassDay(
         db.prepare('SELECT * FROM class_days WHERE class_id = ? AND date = ?').get(child.class_id, date),
       ),
+      menu: menuFor(child, date),
     };
+  }
+
+  // Parents reach the menu only through their own child's kindergarten.
+  function menuFor(child, date) {
+    return serializeMenu(
+      db
+        .prepare(
+          `SELECT m.* FROM menus m JOIN classes cl ON cl.kindergarten_id = m.kindergarten_id
+           WHERE cl.id = ? AND m.date = ?`,
+        )
+        .get(child.class_id, date),
+    );
   }
 
   r.get('/children/:childId/day', (req, res) => {
@@ -82,6 +96,7 @@ export function parentRoutes(db) {
       day: serializeClassDay(
         db.prepare('SELECT * FROM class_days WHERE class_id = ? AND date = ?').get(child.class_id, row.date),
       ),
+      menu: menuFor(child, row.date),
     }));
     res.json({ days });
   });

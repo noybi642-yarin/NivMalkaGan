@@ -54,7 +54,7 @@ export default function ParentApp({ user, onLogout }) {
   );
 
   let content;
-  if (tab === 'vacations') content = <ParentVacations logoutButton={logoutButton} />;
+  if (tab === 'vacations') content = <ParentVacations place={info.data?.kindergarten?.name} logoutButton={logoutButton} />;
   else if (error) content = <ErrorState onRetry={reload} />;
   else if (!data) content = <Loading />;
   else if (!child) content = <div className="empty"><p>עוד לא קושרו ילדים לחשבון. פנו לצוות הגן.</p>{logoutButton}</div>;
