@@ -49,7 +49,7 @@ server/            Express API
   test/            node:test API & permission tests
 client/src/        React (Vite), RTL Hebrew UI
   teacher/         היום (batch + exceptions) · הילדים · הגן · child sheet
-  parent/          היום של ניב · עדכון לגן · הילדה שלי
+  parent/          היום של ניב · עדכון לגן · הילדה שלי · לוח חופשות (schedule data: parent/vacations.js)
   manager/         הגן שלי · הכיתות · ניהול
   shared/          API client, Hebrew copy & gender-aware phrasing, UI primitives
 ```

@@ -5,6 +5,7 @@ import { ErrorState, IconButton, Loading, Shell } from '../shared/ui.jsx';
 import ParentToday from './ParentToday.jsx';
 import ParentUpdate from './ParentUpdate.jsx';
 import MyChild from './MyChild.jsx';
+import Vacations from './Vacations.jsx';
 
 const STORAGE_KEY = 'gan:child';
 
@@ -36,6 +37,7 @@ export default function ParentApp({ user, onLogout }) {
     { key: 'today', label: 'היום', icon: 'today' },
     { key: 'update', label: 'הודעות לגן', icon: 'message' },
     { key: 'child', label: child ? childWord(child.gender) : 'הילד/ה שלי', icon: 'heart' },
+    { key: 'vacations', label: 'לוח חופשות', icon: 'calendar' },
   ];
 
   const logoutButton = <IconButton icon="logout" label="יציאה" onClick={onLogout} />;
@@ -51,7 +53,8 @@ export default function ParentApp({ user, onLogout }) {
   );
 
   let content;
-  if (error) content = <ErrorState onRetry={reload} />;
+  if (tab === 'vacations') content = <Vacations logoutButton={logoutButton} />;
+  else if (error) content = <ErrorState onRetry={reload} />;
   else if (!data) content = <Loading />;
   else if (!child) content = <div className="empty"><p>עוד לא קושרו ילדים לחשבון. פנו לצוות הגן.</p>{logoutButton}</div>;
   else {

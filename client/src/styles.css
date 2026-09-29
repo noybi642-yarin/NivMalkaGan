@@ -459,6 +459,24 @@ textarea.input { display: block; margin-bottom: 12px; }
 .history-body { padding-bottom: 6px; background: var(--surface-2); padding-top: 12px; }
 .history-body .hero, .history-body .card { box-shadow: none; }
 
+/* ---------- Parent: vacations ---------- */
+
+.vacations { display: grid; }
+.vacation { padding: 14px 16px; display: grid; gap: 4px; }
+.vacation.is-past { opacity: 0.5; }
+.vacation-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.vacation-top h2 { font-size: 1.05rem; font-weight: 600; }
+.vacation-top .tag { flex: none; }
+.vacation-when strong { font-weight: 600; }
+.vacation-return { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 0.95rem; }
+.vacation-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.vacation-dot.is-short { background: var(--warn); }
+.vacation-summer {
+  display: flex; align-items: center; gap: 12px; margin-top: 8px;
+  background: var(--hero-great); font-weight: 600; font-size: 1.05rem;
+}
+.vacation-summer span { font-size: 1.6rem; }
+
 /* ---------- Manager ---------- */
 
 .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 16px 12px; }
