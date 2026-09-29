@@ -1,5 +1,5 @@
 import { api, useLoad } from '../shared/api.js';
-import { formatDay, greeting, ltr, supplySentence } from '../shared/copy.js';
+import { SUPPLY_TITLE, formatDay, greeting, ltr, supplyLabels } from '../shared/copy.js';
 import { Avatar, ErrorState, Icon, Loading, SectionHead, TopBar, toast } from '../shared/ui.jsx';
 import { vacationStatus } from '../shared/VacationList.jsx';
 import DaySummary, { absentText } from './DaySummary.jsx';
@@ -43,7 +43,8 @@ export default function ParentToday({ child, familyName, kindergarten, logoutBut
   const { report, day, menu } = data;
   const open = data.supplies.filter((s) => s.status === 'open');
   const handledToday = data.supplies.filter((s) => s.status === 'done');
-  const nothingYet = !report.absent && !report.food && !report.mood && !report.highlight && !report.note && !report.sleep && !report.poop;
+  const nothingYet = !report.absent && !report.mood && !report.food_breakfast && !report.food_lunch && !report.food_snack
+    && !report.highlight && !report.note && !report.sleep_quality && !report.poop;
   const today = todayIL();
   const nextVacation = vacations.data?.items.find((v) => vacationStatus(v, today) !== 'past');
 
@@ -68,11 +69,11 @@ export default function ParentToday({ child, familyName, kindergarten, logoutBut
 
       {open.map((s) => (
         <section className="card card-supply" key={s.id}>
-          <div>
-            <h2 className="card-title">למחר <span aria-hidden="true">🎒</span></h2>
-            <p>{supplySentence(s)}</p>
-          </div>
-          <button className="btn btn-primary" onClick={() => markDone(s)}>טופל ✓</button>
+          <h2 className="card-title">🎒 {SUPPLY_TITLE}</h2>
+          <ul className="supply-list">
+            {supplyLabels(s).map((label) => <li key={label}><span aria-hidden="true">✓</span> {label}</li>)}
+          </ul>
+          <button className="btn btn-primary btn-block" onClick={() => markDone(s)}>טופל ✓</button>
         </section>
       ))}
       {open.length === 0 && handledToday.length > 0 && <p className="page-pad seen">✓ סימנת שהציוד טופל</p>}

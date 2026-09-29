@@ -31,7 +31,6 @@ update, parent "היום של ניב", and the vacation calendar.
 - **Three meals with separate ratings and times** — the menu is entered once for the kindergarten; each
   child gets one eating status (אכל/ה יפה / חלקית / כמעט לא).
 - **Four-step progress tracker, "עדכון תוך 30 שניות", character counter** — one screen with one save button.
-- **Milestone suggestion chips** — generic ready-made milestones make updates feel templated.
 - **Notifications bell, "אישרתי וקראתי", get-well messages, team memo, print button, vacation filter
   chips, search, SMS login, age display** — not part of daily communication.
 - **Several announcements with categories** — one "הודעה להורים" at a time.
@@ -48,3 +47,4 @@ update, parent "היום של ניב", and the vacation calendar.
 | הודעה להורים | Inside "הגן" | Own screen, next to the parents' incoming messages |
 | Parent sections | Mood, facts timeline, highlight | איך עבר היום · מה אכלתי · פעילויות · משהו חדש שעשיתי · כדאי שתדעו · הודעות מהגן · לוח חופשות — each hidden when empty |
 | Username + password | Phone number + password | Username + password for both entrances |
+| Quick templates | Some free text | Stitch's quick-select approach extended to every field: 4 moods, 4 eating options per meal, sleep quality + duration chips, "משהו חדש שעשיתי" suggestions, "כדאי שתדעו" phrases, "הורים יקרים, תשלימו לי:" supply chips |

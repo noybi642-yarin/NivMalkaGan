@@ -41,7 +41,7 @@ export default function MyChild({ child, kindergarten, logoutButton, switcher })
             const open = openDate === date;
             const line = report.absent
               ? absentText(child)
-              : [report.food && foodLabel(report.food, child.gender), report.highlight && `🌟 ${report.highlight}`]
+              : [report.food_lunch && foodLabel(report.food_lunch, child.gender), report.highlight && `🌟 ${report.highlight}`]
                 .filter(Boolean).join(' · ');
             return (
               <li key={date} className="card history-day">

@@ -58,7 +58,7 @@ sessions (hashed tokens → users)
 | Table | Notes |
 |---|---|
 | `kindergartens` | Root of all data. Holds the general info parents see (hours, phone, notice), the school year and the summer start. Everything else is reachable only through a `kindergarten_id`, so more kindergartens can be added later without changing the model. |
-| `daily_reports` | `absent`, `food` (well/partial/little — אכל/ה יפה / חלקית / כמעט לא), `activities` (which of the class's activities the child joined; NULL = all), `sleep_status` (slept/none) + `sleep_start`/`sleep_end`, `poop` (yes/no), `mood` (great/good/hard), `highlight` (רגע קטן מהיום — observations and milestones), `note` (כדאי לדעת). One row per child per day, upserted field-by-field. |
+| `daily_reports` | `absent`, `mood` (happy/calm/tired/hard — שמח/ה · רגוע/ה · קצת עייף/ה · היה לי יום קצת קשה), `food_breakfast` / `food_lunch` / `food_snack` (well/partial/tasted/little — אכל/ה יפה · חלקית · טעם/ה מעט · כמעט לא אכל/ה), `sleep_quality` (great/good/hard/none — ישן/ה מצוין · טוב · נרדם/ה בקושי · לא ישן/ה) + optional `sleep_minutes`, `poop`, `activities` (NULL = all of the class's), `highlight` (משהו חדש שעשיתי), `note` (כדאי שתדעו). One row per child per day. |
 | `menus` | Breakfast / lunch / snack — entered **once per day for the whole kindergarten**. Children only get an eating status. |
 | `class_days` | Today's activities — defined **once** per class; each child's update ticks which ones they joined. |
 | `vacations` | Name, type (holiday / staff_day / short_day), start/end/return dates, note. Display wording and weekdays are derived from the dates; optional overrides keep official wording such as "11.09 + 13.09". |
@@ -66,7 +66,9 @@ sessions (hashed tokens → users)
 | `parent_updates` | Structured morning updates (fixed options + optional short note). Staff marks "ראיתי" and the parent sees "הגן ראה ✓". Not a chat. |
 | `children.gender` | Used only to render correct Hebrew grammar ("אכלה" / "אכל"). |
 
-A report is **complete** ("עודכן") when mood and eating are set; sleep and bowel movement are optional.
+A report is **complete** ("עודכן") when mood and at least one meal are set; sleep and bowel movement are optional.
+
+**Quick templates** (tap → tap → tap → save): every field of the child update is a ready-made option. "משהו חדש שעשיתי" and "כדאי שתדעו" offer one-tap phrases (in the child's voice / gendered for the child) that fill the text box, which stays editable. Supplies use "הורים יקרים, תשלימו לי:" with multi-select items (חיתולים, מגבונים, בגדים להחלפה, מצעים, בקבוק, מוצץ, אחר + free text).
 Children marked absent are excluded from completion percentages.
 
 ## 4. Permissions

@@ -132,7 +132,7 @@ describe('parent permissions', () => {
   test('cannot use staff endpoints, even by editing the request', async () => {
     const cookie = await login(DEMO_ACCOUNTS.parent.username);
     assert.equal((await call(cookie, 'GET', '/staff/today')).status, 403);
-    assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('ניב')}/report`, { mood: 'great' })).status, 403);
+    assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('ניב')}/report`, { mood: 'happy' })).status, 403);
     assert.equal((await call(cookie, 'POST', '/staff/vacations', {})).status, 403);
     assert.equal((await call(cookie, 'PUT', '/staff/kindergarten', {})).status, 403);
   });
@@ -148,8 +148,9 @@ describe('parent permissions', () => {
     const cookie = await login(DEMO_ACCOUNTS.parent.username);
     const niv = childId('ניב');
     const day = await (await call(cookie, 'GET', `/parent/children/${niv}/day`)).json();
-    assert.equal(day.report.mood, 'good');
-    assert.equal(day.report.sleep.minutes, 95);
+    assert.equal(day.report.mood, 'happy');
+    assert.equal(day.report.sleep_minutes, 95);
+    assert.equal(day.report.food_snack, 'tasted');
     assert.deepEqual(day.day.activities, ['חוג מוזיקה', 'יצירה', 'חצר']);
     assert.equal(day.report.activities, null); // null = joined all of today's activities
     assert.equal(day.menu.lunch, 'קציצות, אורז וירקות');
@@ -181,26 +182,38 @@ describe('staff permissions', () => {
   test('batch update applies to one class, rejects children from other classes', async () => {
     const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const res = await call(cookie, 'POST', `/staff/classes/${classId('צעירים')}/reports`, {
-      field: 'food',
+      field: 'food_lunch',
       entries: [{ childId: childId('יואב'), value: 'well' }, { childId: childId('תמר'), value: 'well' }],
     });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.children.find((c) => c.name === 'תמר').report.food, 'well');
+    assert.equal(body.children.find((c) => c.name === 'תמר').report.food_lunch, 'well');
 
     const cross = await call(cookie, 'POST', `/staff/classes/${classId('צעירים')}/reports`, {
-      field: 'food',
+      field: 'food_lunch',
       entries: [{ childId: childId('עידו'), value: 'little' }],
     });
     assert.equal(cross.status, 400);
   });
 
-  test('validates sleep times', async () => {
+  test('validates sleep quality and duration', async () => {
     const cookie = await login(DEMO_ACCOUNTS.staff.username);
     const url = `/staff/children/${childId('יואב')}/report`;
-    assert.equal((await call(cookie, 'PATCH', url, { sleep: { status: 'slept', start: '14:00', end: '13:00' } })).status, 400);
-    const ok = await (await call(cookie, 'PATCH', url, { sleep: { status: 'slept', start: '12:30', end: '14:05' } })).json();
-    assert.equal(ok.report.sleep.minutes, 95);
+    assert.equal((await call(cookie, 'PATCH', url, { sleep_minutes: -5 })).status, 400);
+    assert.equal((await call(cookie, 'PATCH', url, { sleep_quality: 'amazing' })).status, 400);
+    const ok = await (await call(cookie, 'PATCH', url, { sleep_quality: 'good', sleep_minutes: 90 })).json();
+    assert.deepEqual([ok.report.sleep_quality, ok.report.sleep_minutes], ['good', 90]);
+  });
+
+  test('supply request: several items, including pacifier, sheets and a free-text other', async () => {
+    const staff = await login(DEMO_ACCOUNTS.staff.username);
+    const res = await (await call(staff, 'PUT', `/staff/children/${childId('תמר')}/supplies`, {
+      items: ['diapers', 'sheets', 'pacifier', 'other'], otherText: 'כובע',
+    })).json();
+    const today = res.supplies[0];
+    assert.deepEqual(today.items, ['diapers', 'sheets', 'pacifier', 'other']);
+    assert.equal(today.otherText, 'כובע');
+    assert.equal((await call(staff, 'PUT', `/staff/children/${childId('תמר')}/supplies`, { items: ['toys'] })).status, 400);
   });
 
   test("lists today's parent messages of their kindergarten only", async () => {
@@ -212,7 +225,7 @@ describe('staff permissions', () => {
 
   test('can update any child in the kindergarten', async () => {
     const cookie = await login(DEMO_ACCOUNTS.staff.username);
-    assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('עידו')}/report`, { mood: 'great' })).status, 200);
+    assert.equal((await call(cookie, 'PATCH', `/staff/children/${childId('עידו')}/report`, { mood: 'calm' })).status, 200);
   });
 
   test('general info reaches parents', async () => {
@@ -228,17 +241,17 @@ describe('staff permissions', () => {
     await call(staff, 'PUT', '/staff/menu', { breakfast: 'חביתה', lunch: 'פסטה', snack: null });
     await call(staff, 'PUT', `/staff/classes/${classId('צעירים')}/day`, { activities: ['יצירה', 'יצירה', 'חצר'] });
     const saved = await call(staff, 'PATCH', `/staff/children/${childId('ניב')}/report`, {
-      mood: 'great', food: 'well', activities: ['חצר'], highlight: 'טיפסה לבד על המגלשה',
+      mood: 'happy', food_lunch: 'well', activities: ['חצר'], highlight: 'טיפסתי לבד על המגלשה',
     });
     assert.equal(saved.status, 200);
-    assert.equal((await call(staff, 'PATCH', `/staff/children/${childId('ניב')}/report`, { food: 'all' })).status, 400);
+    assert.equal((await call(staff, 'PATCH', `/staff/children/${childId('ניב')}/report`, { food_lunch: 'all' })).status, 400);
 
     const parent = await login(DEMO_ACCOUNTS.parent.username);
     const day = await (await call(parent, 'GET', `/parent/children/${childId('ניב')}/day`)).json();
     assert.equal(day.menu.lunch, 'פסטה');
     assert.deepEqual(day.day.activities, ['יצירה', 'חצר']);
     assert.deepEqual(day.report.activities, ['חצר']);
-    assert.equal(day.report.food, 'well');
+    assert.equal(day.report.food_lunch, 'well');
 
     // Another kindergarten's menu is never visible.
     const other = await login(OTHER.parent);

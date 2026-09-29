@@ -55,12 +55,14 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   child_id     INTEGER NOT NULL REFERENCES children(id),
   date         TEXT NOT NULL,
   absent       INTEGER NOT NULL DEFAULT 0,
-  food         TEXT CHECK (food IN ('well', 'partial', 'little')),
-  sleep_status TEXT CHECK (sleep_status IN ('slept', 'none')),
-  sleep_start  TEXT,
-  sleep_end    TEXT,
+  mood           TEXT CHECK (mood IN ('happy', 'calm', 'tired', 'hard')),
+  -- How the child ate each meal of the kindergarten's menu.
+  food_breakfast TEXT CHECK (food_breakfast IN ('well', 'partial', 'tasted', 'little')),
+  food_lunch     TEXT CHECK (food_lunch IN ('well', 'partial', 'tasted', 'little')),
+  food_snack     TEXT CHECK (food_snack IN ('well', 'partial', 'tasted', 'little')),
+  sleep_quality  TEXT CHECK (sleep_quality IN ('great', 'good', 'hard', 'none')),
+  sleep_minutes  INTEGER,
   poop         TEXT CHECK (poop IN ('yes', 'no')),
-  mood         TEXT CHECK (mood IN ('great', 'good', 'hard')),
   highlight    TEXT,
   note         TEXT,
   -- Which of the class's activities the child joined; NULL = all of them (the default).
@@ -134,7 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_supplies_child ON supply_requests(child_id, statu
 CREATE INDEX IF NOT EXISTS idx_updates_child_date ON parent_updates(child_id, date);
 `;
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 export function openDb(file = process.env.DB_PATH || path.resolve('data/gan.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });

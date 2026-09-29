@@ -53,14 +53,16 @@ const CLASSES = [
   },
 ];
 
-const FULL = { food: 'well', sleep_status: 'slept', sleep_start: '12:30', sleep_end: '14:30', poop: 'no', mood: 'good' };
+const FULL = {
+  mood: 'happy', food_breakfast: 'well', food_lunch: 'well', food_snack: 'well', sleep_quality: 'good', sleep_minutes: 120, poop: 'no',
+};
 
 const NIV_HISTORY = [
-  { food: 'well', sleep_start: '12:35', sleep_end: '14:20', poop: 'yes', mood: 'great', highlight: 'ניב בנתה מגדל קוביות גבוה ומחאה לעצמה כפיים', activities: ['יצירה', 'חצר'] },
-  { food: 'little', sleep_start: '12:50', sleep_end: '13:55', poop: 'no', mood: 'hard', note: 'ניב הייתה קצת עייפה היום וביקשה הרבה חיבוקים', activities: ['סיפור'] },
-  { food: 'partial', sleep_start: '12:30', sleep_end: '14:30', poop: 'yes', mood: 'good', highlight: 'שרה עם כולם את "בוקר טוב" במעגל', activities: ['חוג מוזיקה'] },
-  { food: 'well', sleep_start: '12:40', sleep_end: '14:10', poop: 'yes', mood: 'great', highlight: 'ניב האכילה את הבובה שלה בכפית, בדיוק כמו שהיא לומדת', activities: ['משחקי מים'] },
-  { food: 'partial', sleep_start: '12:30', sleep_end: '14:00', poop: 'no', mood: 'good', activities: ['פעילות תנועה'] },
+  { lunch: 'well', sleep: 'great', minutes: 105, poop: 'yes', mood: 'happy', highlight: 'ניב בנתה מגדל קוביות גבוה ומחאה לעצמה כפיים', activities: ['יצירה', 'חצר'] },
+  { lunch: 'little', sleep: 'hard', minutes: 65, poop: 'no', mood: 'tired', note: 'ניב הייתה קצת עייפה היום וביקשה הרבה חיבוקים', activities: ['סיפור'] },
+  { lunch: 'partial', sleep: 'good', minutes: 120, poop: 'yes', mood: 'calm', highlight: 'שרה עם כולם את "בוקר טוב" במעגל', activities: ['חוג מוזיקה'] },
+  { lunch: 'well', sleep: 'great', minutes: 90, poop: 'yes', mood: 'happy', highlight: 'ניב האכילה את הבובה שלה בכפית, בדיוק כמו שהיא לומדת', activities: ['משחקי מים'] },
+  { lunch: 'partial', sleep: 'good', minutes: 90, poop: 'no', mood: 'calm', activities: ['פעילות תנועה'] },
 ];
 
 /** Previous kindergarten days (Sunday–Thursday), most recent first. */
@@ -140,13 +142,14 @@ export function seed(db, today = todayIL()) {
     // צעירים: Niv's day is done, a few others too, the rest waits for the teacher.
     classDay('צעירים', today, ['חוג מוזיקה', 'יצירה', 'חצר']);
     report('ניב', today, {
-      food: 'partial', sleep_status: 'slept', sleep_start: '12:40', sleep_end: '14:15', poop: 'yes', mood: 'good',
-      highlight: 'ניב ניסתה היום לאכול לבד עם כפית',
+      mood: 'happy', food_breakfast: 'well', food_lunch: 'partial', food_snack: 'tasted',
+      sleep_quality: 'good', sleep_minutes: 95, poop: 'yes',
+      highlight: 'אכלתי לבד עם כפית',
       note: 'ניב הייתה קצת עייפה אחרי ארוחת הצהריים ונרדמה מהר במנוחה',
     });
-    report('מאיה', today, { ...FULL, mood: 'great' });
-    report('איתי', today, { ...FULL, food: 'partial', poop: 'yes', activities: JSON.stringify(['חוג מוזיקה', 'חצר']) });
-    report('נועה', today, { food: 'well' });
+    report('מאיה', today, { ...FULL, mood: 'calm' });
+    report('איתי', today, { ...FULL, food_lunch: 'partial', poop: 'yes', activities: JSON.stringify(['חוג מוזיקה', 'חצר']) });
+    report('נועה', today, { food_lunch: 'well' });
     report('דניאל', today, { absent: 1 });
     supply('ניב', today, ['wipes']);
     parentUpdate(dana, 'יואב', ['early_pickup'], 'אבא יגיע ב-13:30');
@@ -155,12 +158,12 @@ export function seed(db, today = todayIL()) {
     // --- Other classes, so the class overview has something real to show.
     classDay('תינוקייה', today, ['משחקי חושים']);
     ['אגם', 'רון', 'הדר', 'יונתן', 'אלה', 'נדב'].forEach((c) => report(c, today, FULL));
-    report('רומי', today, { food: 'partial', mood: 'good' });
+    report('רומי', today, { food_lunch: 'partial', mood: 'calm' });
     report('גיא', today, { absent: 1 });
     supply('אגם', addDays(today, -1), ['diapers']);
 
     classDay('בוגרים', today, ['יצירה', 'פעילות תנועה']);
-    CLASSES[2].children.slice(0, 11).forEach(([c]) => report(c, today, { ...FULL, sleep_start: '13:00', sleep_end: '14:30' }));
+    CLASSES[2].children.slice(0, 11).forEach(([c]) => report(c, today, { ...FULL, sleep_minutes: 90 }));
     db.prepare('UPDATE daily_reports SET note = ? WHERE child_id = ? AND date = ?')
       .run('עידו קיבל מכה קלה בברך בחצר. טיפלנו, והכל בסדר', kids['עידו'], today);
     supply('עלמה', today, ['clothes']);
@@ -168,7 +171,10 @@ export function seed(db, today = todayIL()) {
     // --- Niv's recent days, for the "הילדה שלי" tab.
     previousGanDays(today, NIV_HISTORY.length).forEach((date, i) => {
       const { activities, ...h } = NIV_HISTORY[i];
-      report('ניב', date, { food: h.food, sleep_status: 'slept', sleep_start: h.sleep_start, sleep_end: h.sleep_end, poop: h.poop, mood: h.mood, highlight: h.highlight ?? null, note: h.note ?? null });
+      report('ניב', date, {
+        mood: h.mood, food_breakfast: 'well', food_lunch: h.lunch, sleep_quality: h.sleep, sleep_minutes: h.minutes,
+        poop: h.poop, highlight: h.highlight ?? null, note: h.note ?? null,
+      });
       classDay('צעירים', date, activities);
       menu(date, 'לחם, ממרח וירקות', 'אורז, עוף וירקות');
     });

@@ -1,36 +1,26 @@
 import { useState } from 'react';
-import { FIELDS, sleepShort } from '../shared/copy.js';
-import { Icon, Segmented, Sheet, TopBar } from '../shared/ui.jsx';
-import SleepEditor from './SleepEditor.jsx';
+import { FIELDS, MENU_MEALS, SLEEP_DURATIONS, formatDuration } from '../shared/copy.js';
+import { Icon, Segmented, TopBar } from '../shared/ui.jsx';
 
-/** Most common sleep window already entered today — the smart default for the batch. */
-function commonSleep(children) {
-  const counts = new Map();
-  for (const c of children) {
-    const s = c.report.sleep;
-    if (s?.status === 'slept') counts.set(`${s.start}|${s.end}`, (counts.get(`${s.start}|${s.end}`) || 0) + 1);
-  }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (!top) return { start: '12:30', end: '14:30' };
-  const [start, end] = top[0].split('|');
-  return { start, end };
-}
+/** Row buttons are compact: short word only, emoji stays on the group buttons. */
+const rowOptions = (options) => options.map(({ value, short }) => ({ value, short }));
 
 /** עדכון מהיר לקבוצה: one field at a time for the whole group, then the exceptions. */
 export default function TodayScreen({ data, place, applyField, patchChild, onOpenChild, onBack, classSwitcher }) {
   const [fieldKey, setFieldKey] = useState('food');
+  const menuMeals = MENU_MEALS.filter((m) => data.menu?.[m.key]);
+  const meals = menuMeals.length ? menuMeals : MENU_MEALS;
+  const [meal, setMeal] = useState(meals.find((m) => m.key === 'lunch')?.key ?? meals[0].key);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
-  const [sleepChildId, setSleepChildId] = useState(null);
-  const [batchSleep, setBatchSleep] = useState(null);
 
   const field = FIELDS.find((f) => f.key === fieldKey);
+  // Eating is recorded per meal; the tab works on the meal picked below it.
+  const reportKey = fieldKey === 'food' ? `food_${meal}` : fieldKey;
   const present = data.children.filter((c) => !c.report.absent);
   const absent = data.children.filter((c) => c.report.absent);
   const complete = present.filter((c) => c.report.complete).length;
-  const unset = present.filter((c) => c.report[fieldKey] == null);
-  const sleepDefaults = commonSleep(present);
-
+  const unset = present.filter((c) => c.report[reportKey] == null);
 
   // Smart default target: whoever isn't set yet, so batching never overwrites an exception.
   let targets;
@@ -45,10 +35,15 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
     targets = present;
     targetLabel = `לכולם (${present.length})`;
   }
+  // Sleep duration goes to whoever slept (within the selection, if there is one) — and, like the other
+  // group buttons, first to those without a duration yet, so it never overwrites an exception.
+  const slept = (selecting ? targets : present).filter((c) => c.report.sleep_quality && c.report.sleep_quality !== 'none');
+  const noDuration = slept.filter((c) => !c.report.sleep_minutes);
+  const sleepers = !selecting && noDuration.length ? noDuration : slept;
 
-  function batch(value) {
-    if (!targets.length) return;
-    applyField(fieldKey, targets.map((c) => ({ childId: c.id, value })));
+  function batch(key, value, list = targets) {
+    if (!list.length) return;
+    applyField(key, list.map((c) => ({ childId: c.id, value })));
     setSelecting(false);
     setSelected(new Set());
   }
@@ -61,7 +56,10 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
     });
   }
 
-  const sleepChild = data.children.find((c) => c.id === sleepChildId);
+  const tabDone = (f) => {
+    const key = f.key === 'food' ? `food_${meal}` : f.key;
+    return present.filter((c) => c.report[key] != null).length;
+  };
   const allDone = present.length > 0 && complete === present.length;
 
   return (
@@ -85,7 +83,7 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
       <div className="sticky-controls">
         <div className="field-tabs" role="tablist" aria-label="מה מעדכנים">
           {FIELDS.map((f) => {
-            const done = present.filter((c) => c.report[f.key] != null).length;
+            const done = tabDone(f);
             return (
               <button key={f.key} role="tab" aria-selected={f.key === fieldKey}
                 className={`field-tab${f.key === fieldKey ? ' is-active' : ''}${done === present.length ? ' is-done' : ''}`}
@@ -99,22 +97,41 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
         </div>
 
         <div className="batch">
+          {fieldKey === 'food' && meals.length > 1 && (
+            <div className="meal-picker" role="tablist" aria-label="איזו ארוחה">
+              {meals.map((m) => (
+                <button key={m.key} role="tab" aria-selected={m.key === meal} className={m.key === meal ? 'is-on' : ''}
+                  onClick={() => setMeal(m.key)}>
+                  {m.emoji} {m.label.replace('ארוחת ', '')}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="batch-head">
             <span className="batch-target">{targetLabel}</span>
             <button className="link-btn" onClick={() => { setSelecting((s) => !s); setSelected(new Set()); }}>
               {selecting ? 'ביטול בחירה' : 'בחירה'}
             </button>
           </div>
-          {fieldKey === 'sleep' ? (
-            <BatchSleep value={batchSleep ?? sleepDefaults} onChange={setBatchSleep}
-              disabled={!targets.length} onApply={(v) => batch({ status: 'slept', ...v })} />
-          ) : (
-            <div className={`batch-actions n${field.options.length}`}>
-              {field.options.map((o) => (
-                <button key={o.value} className="btn btn-batch" disabled={!targets.length} onClick={() => batch(o.value)}>
-                  {o.emoji && <span aria-hidden="true">{o.emoji} </span>}{o.batch}
-                </button>
-              ))}
+          <div className={`batch-actions n${field.options.length}`}>
+            {field.options.map((o) => (
+              <button key={o.value} className="btn btn-batch" disabled={!targets.length} onClick={() => batch(reportKey, o.value)}>
+                {o.emoji && <span aria-hidden="true">{o.emoji} </span>}{o.batch}
+              </button>
+            ))}
+          </div>
+          {fieldKey === 'sleep_quality' && (
+            <div className="batch-duration">
+              <span className="batch-target">
+                כמה זמן ישנו? {!selecting && noDuration.length && noDuration.length < slept.length ? `(למי שטרם סומן: ${sleepers.length})` : `(${sleepers.length})`}
+              </span>
+              <div className="chips">
+                {SLEEP_DURATIONS.map((min) => (
+                  <button key={min} className="chip" disabled={!sleepers.length} onClick={() => batch('sleep_minutes', min, sleepers)}>
+                    {formatDuration(min)}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -132,17 +149,16 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
               <>
                 <button className="row-name-btn" onClick={() => onOpenChild(c.id)}>
                   <span className={`status-dot${c.report.complete ? ' is-complete' : ''}`} />
-                  <span className="row-name">{c.name}</span>
+                  <span className="row-name">
+                    {c.name}
+                    {fieldKey === 'sleep_quality' && c.report.sleep_minutes && c.report.sleep_quality !== 'none' && (
+                      <small className="row-sub">{formatDuration(c.report.sleep_minutes)}</small>
+                    )}
+                  </span>
                   {c.parentUpdates.some((u) => !u.seen) && <span className="row-flag" title="הודעה מההורים">✉️</span>}
                 </button>
-                {fieldKey === 'sleep' ? (
-                  <button className={`sleep-cell${c.report.sleep ? ' is-set' : ''}`} onClick={() => setSleepChildId(c.id)}>
-                    {sleepShort(c.report.sleep, c.gender) ?? 'הוספת שעות'}
-                  </button>
-                ) : (
-                  <Segmented size="row" label={`${field.label} — ${c.name}`} options={field.options}
-                    value={c.report[fieldKey]} onChange={(v) => patchChild(c.id, { [fieldKey]: v })} />
-                )}
+                <Segmented size="row" label={`${field.label} — ${c.name}`} options={rowOptions(field.options)}
+                  value={c.report[reportKey]} onChange={(v) => patchChild(c.id, { [reportKey]: v })} />
               </>
             )}
           </li>
@@ -158,32 +174,6 @@ export default function TodayScreen({ data, place, applyField, patchChild, onOpe
         </section>
       )}
       <p className="hint">לחיצה על שם פותחת את העדכון האישי — שם גם מסמנים מי לא הגיע/ה</p>
-
-      <Sheet open={Boolean(sleepChild)} onClose={() => setSleepChildId(null)} label="שינה">
-        {sleepChild && (
-          <>
-            <h2 className="sheet-title">השינה של {sleepChild.name}</h2>
-            <SleepEditor key={sleepChild.id} value={sleepChild.report.sleep} gender={sleepChild.gender}
-              defaults={sleepDefaults} onChange={(v) => patchChild(sleepChild.id, { sleep: v })} />
-            <button className="btn btn-primary btn-block" onClick={() => setSleepChildId(null)}>סיום</button>
-          </>
-        )}
-      </Sheet>
     </>
   );
 }
-
-function BatchSleep({ value, onChange, onApply, disabled }) {
-  const valid = value.start && value.end && value.end > value.start;
-  return (
-    <div className="batch-sleep">
-      <input className="input input-time" type="time" step="300" aria-label="נרדמו" value={value.start}
-        onChange={(e) => onChange({ ...value, start: e.target.value })} />
-      <span className="muted">עד</span>
-      <input className="input input-time" type="time" step="300" aria-label="התעוררו" value={value.end}
-        onChange={(e) => onChange({ ...value, end: e.target.value })} />
-      <button className="btn btn-batch" disabled={disabled || !valid} onClick={() => onApply(value)}>ישנו</button>
-    </div>
-  );
-}
-

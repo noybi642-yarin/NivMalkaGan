@@ -29,11 +29,7 @@ function storedClass() {
 /** Applies a field value to a local report so the UI responds instantly. */
 function localReport(report, field, value) {
   const next = { ...report, [field]: value };
-  if (field === 'sleep' && value?.status === 'slept') {
-    const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
-    next.sleep = { ...value, minutes: toMin(value.end) - toMin(value.start) };
-  }
-  next.complete = !next.absent && Boolean(next.food && next.mood);
+  next.complete = !next.absent && Boolean(next.mood && (next.food_breakfast || next.food_lunch || next.food_snack));
   return next;
 }
 
@@ -209,6 +205,7 @@ export default function TeacherApp({ user, onLogout }) {
             child={child}
             date={data.date}
             day={data.day}
+            menu={data.menu}
             place={data.class.name}
             nextChild={nextPending}
             onBack={back}
@@ -270,9 +267,4 @@ function ClassSwitcher({ classes, value, onChange }) {
 }
 
 /** Report values as the API expects them back (used for undo). */
-function toApiValue(field, value) {
-  if (field === 'sleep' && value) {
-    return value.status === 'none' ? { status: 'none' } : { status: 'slept', start: value.start, end: value.end };
-  }
-  return value ?? null;
-}
+const toApiValue = (_field, value) => value ?? null;

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { MOOD, childStatus, foodLabel, g, statusLabel, supplyLabels } from '../shared/copy.js';
 import { Avatar, StatusPill, TopBar } from '../shared/ui.jsx';
 
+/** The main meal's rating for the card snapshot (lunch first). */
+const eaten = (r) => r.food_lunch ?? r.food_breakfast ?? r.food_snack;
+
 const FILTERS = [
   { key: 'all', label: 'הכל' },
   { key: 'pending', label: 'ממתינים לעדכון' },
@@ -50,10 +53,10 @@ export default function ChildrenScreen({ data, place, logoutButton, classSwitche
                 <StatusPill status={c.status}>{statusLabel(c.status, c.gender)}</StatusPill>
               </button>
 
-              {(mood || c.report.food) && c.status !== 'absent' && (
+              {(mood || eaten(c.report)) && c.status !== 'absent' && (
                 <div className="snapshot">
-                  {mood && <span>{mood.emoji} {mood.label}</span>}
-                  {c.report.food && <span>🍽️ {foodLabel(c.report.food, c.gender)}</span>}
+                  {mood && <span>{mood.emoji} {mood.label(c.gender)}</span>}
+                  {eaten(c.report) && <span>🍽️ {foodLabel(eaten(c.report), c.gender)}</span>}
                 </div>
               )}
               {c.report.highlight && <p className="snapshot-line lilac">🌟 {c.report.highlight}</p>}
